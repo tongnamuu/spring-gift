@@ -1,0 +1,24 @@
+#!/bin/sh
+
+commit_msg_file=$1
+marker="Codex Prompts:"
+
+git_dir=$(git rev-parse --git-dir 2>/dev/null) || exit 0
+prompt_log="$git_dir/codex-commit-prompts.md"
+
+if [ ! -s "$prompt_log" ]; then
+    exit 0
+fi
+
+if ! grep -q '[^[:space:]]' "$prompt_log"; then
+    exit 0
+fi
+
+if grep -q "^$marker$" "$commit_msg_file"; then
+    exit 0
+fi
+
+{
+    printf '\n\n%s\n' "$marker"
+    cat "$prompt_log"
+} >> "$commit_msg_file"

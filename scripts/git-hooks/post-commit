@@ -1,0 +1,12 @@
+#!/bin/sh
+
+git_dir=$(git rev-parse --git-dir 2>/dev/null) || exit 0
+prompt_log="$git_dir/codex-commit-prompts.md"
+prompt_archive="$git_dir/codex-commit-prompts.last.md"
+
+if [ ! -s "$prompt_log" ]; then
+    exit 0
+fi
+
+cp "$prompt_log" "$prompt_archive"
+: > "$prompt_log"
