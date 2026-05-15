@@ -8,7 +8,7 @@ Spring Boot gift service for practicing production-like execution, automated ver
 - Main code is organized by feature under `src/main/java/gift`.
 - Flyway migrations are in `src/main/resources/db/migration`.
 - Thymeleaf admin templates are in `src/main/resources/templates`.
-- Docker Compose MySQL setup exists in `compose.yaml`.
+- Docker Compose MySQL setup uses MySQL 8.4.9 LTS in `compose.yaml`.
 - Baseline `./gradlew test` currently succeeds, but there are no real test classes yet.
 - Controllers currently contain most business logic; service extraction is still pending.
 
@@ -21,8 +21,19 @@ Spring Boot gift service for practicing production-like execution, automated ver
 - Do not skip or disable tests to make a change pass.
 - Verify behavior through observable results, not only absence of exceptions.
 
+## Commit Prompt Hook
+
+This checkout uses `scripts/git-hooks` as `core.hooksPath`. Before committing work done through AI prompts, record each user prompt with:
+
+```bash
+scripts/record-commit-prompt.sh "prompt text"
+```
+
+The `prepare-commit-msg` hook appends the recorded prompts to the commit body under `Codex Prompts:`. After a successful commit, `post-commit` archives the prompt log to `.git/codex-commit-prompts.last.md` and clears it for the next commit.
+
 ## Implementation Checklist
 
+- [x] Configure local development to use a non-EOL MySQL LTS version.
 - [ ] Add deterministic test configuration using H2 and Flyway.
 - [ ] Add baseline domain tests for product/option validators, stock subtraction, and point deduction.
 - [ ] Add API or service tests for product, category, option, member, wish, and order workflows.
@@ -47,9 +58,11 @@ Spring Boot gift service for practicing production-like execution, automated ver
 
 ## Verification Log
 
-- `./gradlew test` - pending after test setup.
+- `docker compose config` - passed with MySQL 8.4.9 service.
+- `./gradlew test` - passed; no real test classes yet.
 - `./gradlew build` - pending before final handoff.
 
 ## AI Usage Record
 
 - Documentation reorganization: moved assignment instructions to ignored `homework.md`, converted `README.md` into the implementation plan, and added `homework.md` to `.gitignore`.
+- Database setup: selected MySQL 8.4.9 LTS after checking MySQL lifecycle and Spring Boot-managed Connector/J compatibility.
