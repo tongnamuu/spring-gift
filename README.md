@@ -34,6 +34,7 @@ The `prepare-commit-msg` hook appends the recorded prompts to the commit body un
 ## Implementation Checklist
 
 - [x] Configure local development to use a non-EOL MySQL LTS version.
+- [x] Define black-box Cucumber feature specifications for API workflows.
 - [ ] Add deterministic test configuration using H2 and Flyway.
 - [ ] Add baseline domain tests for product/option validators, stock subtraction, and point deduction.
 - [ ] Add API or service tests for product, category, option, member, wish, and order workflows.
@@ -60,9 +61,11 @@ The `prepare-commit-msg` hook appends the recorded prompts to the commit body un
 
 - `docker compose config` - passed with MySQL 8.4.9 service.
 - `./gradlew test` - passed; no real test classes yet.
+- Cucumber feature files added under `src/test/resources/features`; step definitions and runner are not configured yet.
 - `./gradlew build` - pending before final handoff.
 
 ## AI Usage Record
 
 - Documentation reorganization: moved assignment instructions to ignored `homework.md`, converted `README.md` into the implementation plan, and added `homework.md` to `.gitignore`.
 - Database setup: selected MySQL 8.4.9 LTS after checking MySQL lifecycle and Spring Boot-managed Connector/J compatibility.
+- Black-box test design: organized current API behavior into Cucumber feature files for member, category, product, option, wish, and order workflows.
