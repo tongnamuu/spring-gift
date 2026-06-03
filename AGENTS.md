@@ -25,7 +25,13 @@ Before adding or changing a class, inspect the existing interface and neighborin
 
 ## Testing Guidelines
 
-The project uses `spring-boot-starter-test`, JUnit 5, and Kotlin test support. Add focused tests for new behavior and regression tests for fixes. Name test classes after the subject, for example `OptionNameValidatorTest` or `OrderControllerTest`. Never use mocks, Mockito, fake repositories, or stub collaborators in tests. Prefer real domain objects for pure domain tests, and use Spring integration tests with the real persistence setup for repository, UseCase, and controller behavior. If a test or verification needs a database, start MySQL with Docker Compose and run against the Flyway-managed schema rather than replacing it with mocks. For behavior changes, assert observable results such as persisted state or response payloads, not just the absence of exceptions. Run `./gradlew test` before submitting.
+The project uses `spring-boot-starter-test`, JUnit 5, and Kotlin test support. Organize tests into three layers by purpose:
+
+- Contract unit tests describe domain rules and small object contracts without Spring, a database, or external systems. Use real domain objects, and hand-written fake repositories when persistence is a collaborator rather than the behavior under test. Examples include validator rules, option stock subtraction, member point charging/deduction, and DTO conversion.
+- Service tests verify actual UseCase behavior through Spring beans and real persistence. Use the real repository and the Flyway-managed schema when persistence behavior matters. If a database is needed, start MySQL with Docker Compose.
+- API tests verify HTTP-level behavior: request validation, status codes, authentication, response payloads, and observable persisted state.
+
+Never use Mockito or dynamic mocks. Hand-written fakes are allowed in unit tests, and fake/stub implementations are allowed at outer service boundaries such as Kakao clients so tests remain deterministic without real network calls. Do not duplicate the same assertion at every layer: unit tests cover rules, service tests cover use case state changes, and API tests cover the external contract. Name test classes after the subject and layer, for example `OptionNameValidatorTest`, `CreateCategoryServiceTest`, or `CategoryApiTest`. For behavior changes, assert observable results such as persisted state or response payloads, not just the absence of exceptions. Run `./gradlew test` before submitting.
 
 ## Commit & Pull Request Guidelines
 
