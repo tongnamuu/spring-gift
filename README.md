@@ -31,6 +31,46 @@ scripts/record-commit-prompt.sh "prompt text"
 
 The `prepare-commit-msg` hook appends the recorded prompts to the commit body under `Codex Prompts:`. After a successful commit, `post-commit` archives the prompt log to `.git/codex-commit-prompts.last.md` and clears it for the next commit.
 
+## Local Runtime Setup
+
+Use `.env.example` as the template for local secrets and runtime values:
+
+```bash
+cp .env.example .env
+```
+
+Fill `.env` with local values. Do not commit `.env`; it is ignored by Git. The application imports `.env` through `application.yaml` and still falls back to defaults where safe.
+
+Start MySQL first, then run the Spring Boot application locally:
+
+```bash
+docker compose up -d mysql
+./gradlew bootRun
+```
+
+The MySQL service uses a named Docker volume, so data survives normal container restarts. Use `docker compose stop mysql` to stop the database without removing data. Use `docker compose down -v` only when you intentionally want to delete the local database volume.
+
+For Kakao Login, create a Kakao Developers app and copy the REST API key and client secret into `.env`:
+
+```env
+KAKAO_CLIENT_ID=replace-with-kakao-rest-api-key
+KAKAO_CLIENT_SECRET=replace-with-kakao-client-secret
+KAKAO_REDIRECT_URI=http://localhost:8080/api/auth/kakao/callback
+```
+
+Register the same redirect URI in Kakao Developers:
+
+```text
+http://localhost:8080/api/auth/kakao/callback
+```
+
+Required Kakao consent items:
+
+| Consent item | Why it is needed |
+| --- | --- |
+| `account_email` | Kakao login uses the Kakao account email to find or create a `Member`. |
+| `talk_message` | Order creation can send a KakaoTalk message to the logged-in user. |
+
 ## Implementation Checklist
 
 - [x] Configure local development to use a non-EOL MySQL LTS version.
@@ -60,6 +100,9 @@ The `prepare-commit-msg` hook appends the recorded prompts to the commit body un
 ## Verification Log
 
 - `docker compose config` - passed with MySQL 8.4.9 service.
+- `docker compose up -d mysql` - passed; MySQL became healthy.
+- `./gradlew bootRun` - passed; application started on port 8080.
+- `curl http://localhost:8080/api/categories` - passed; returned seeded categories.
 - `./gradlew test` - passed; no real test classes yet.
 - Cucumber feature files added under `src/test/resources/features`; step definitions and runner are not configured yet.
 - `./gradlew build` - pending before final handoff.
@@ -69,3 +112,4 @@ The `prepare-commit-msg` hook appends the recorded prompts to the commit body un
 - Documentation reorganization: moved assignment instructions to ignored `homework.md`, converted `README.md` into the implementation plan, and added `homework.md` to `.gitignore`.
 - Database setup: selected MySQL 8.4.9 LTS after checking MySQL lifecycle and Spring Boot-managed Connector/J compatibility.
 - Black-box test design: organized current API behavior into Cucumber feature files for member, category, product, option, wish, and order workflows.
+- Runtime environment setup: added `.env.example`, documented local `.env` usage, MySQL startup, and Kakao Login consent items.
