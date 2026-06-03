@@ -17,25 +17,33 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/categories")
 public class CategoryController {
-    private final CategoryRepository categoryRepository;
+    private final GetCategoriesUseCase getCategoriesUseCase;
+    private final CreateCategoryUseCase createCategoryUseCase;
+    private final UpdateCategoryUseCase updateCategoryUseCase;
+    private final DeleteCategoryUseCase deleteCategoryUseCase;
 
-    public CategoryController(CategoryRepository categoryRepository) {
-        this.categoryRepository = categoryRepository;
+    public CategoryController(
+        GetCategoriesUseCase getCategoriesUseCase,
+        CreateCategoryUseCase createCategoryUseCase,
+        UpdateCategoryUseCase updateCategoryUseCase,
+        DeleteCategoryUseCase deleteCategoryUseCase
+    ) {
+        this.getCategoriesUseCase = getCategoriesUseCase;
+        this.createCategoryUseCase = createCategoryUseCase;
+        this.updateCategoryUseCase = updateCategoryUseCase;
+        this.deleteCategoryUseCase = deleteCategoryUseCase;
     }
 
     @GetMapping
     public ResponseEntity<List<CategoryResponse>> getCategories() {
-        List<CategoryResponse> categories = categoryRepository.findAll().stream()
-            .map(CategoryResponse::from)
-            .toList();
-        return ResponseEntity.ok(categories);
+        return ResponseEntity.ok(getCategoriesUseCase.execute());
     }
 
     @PostMapping
     public ResponseEntity<CategoryResponse> createCategory(@Valid @RequestBody CategoryRequest request) {
-        Category saved = categoryRepository.save(request.toEntity());
-        return ResponseEntity.created(URI.create("/api/categories/" + saved.getId()))
-            .body(CategoryResponse.from(saved));
+        CategoryResponse response = createCategoryUseCase.execute(request);
+        return ResponseEntity.created(URI.create("/api/categories/" + response.id()))
+            .body(response);
     }
 
     @PutMapping("/{id}")
@@ -43,19 +51,14 @@ public class CategoryController {
         @PathVariable Long id,
         @Valid @RequestBody CategoryRequest request
     ) {
-        Category category = categoryRepository.findById(id).orElse(null);
-        if (category == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        category.update(request.name(), request.color(), request.imageUrl(), request.description());
-        categoryRepository.save(category);
-        return ResponseEntity.ok(CategoryResponse.from(category));
+        return updateCategoryUseCase.execute(id, request)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteCategory(@PathVariable Long id) {
-        categoryRepository.deleteById(id);
+        deleteCategoryUseCase.execute(id);
         return ResponseEntity.noContent().build();
     }
 }

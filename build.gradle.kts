@@ -58,6 +58,21 @@ ktlint {
     verbose.set(true)
 }
 
-tasks.withType<Test> {
-    useJUnitPlatform()
+tasks.test {
+    useJUnitPlatform {
+        excludeTags("service")
+    }
+}
+
+tasks.register<Test>("serviceTest") {
+    val testSourceSet = sourceSets.test.get()
+
+    group = "verification"
+    description = "Runs service tests against the MySQL database from Docker Compose."
+    testClassesDirs = testSourceSet.output.classesDirs
+    classpath = testSourceSet.runtimeClasspath
+    shouldRunAfter(tasks.test)
+    useJUnitPlatform {
+        includeTags("service")
+    }
 }
