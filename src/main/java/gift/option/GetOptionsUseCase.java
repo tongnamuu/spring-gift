@@ -1,8 +1,0 @@
-package gift.option;
-
-import java.util.List;
-import java.util.Optional;
-
-public interface GetOptionsUseCase {
-    Optional<List<OptionResponse>> execute(Long productId);
-}

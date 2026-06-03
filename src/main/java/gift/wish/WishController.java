@@ -1,7 +1,7 @@
 package gift.wish;
 
 import gift.auth.AuthenticationResolver;
-import gift.product.ProductRepository;
+import gift.product.repository.ProductRepository;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

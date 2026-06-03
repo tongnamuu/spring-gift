@@ -1,6 +1,6 @@
 package gift.order;
 
-import gift.product.Product;
+import gift.product.entity.Product;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestClient;

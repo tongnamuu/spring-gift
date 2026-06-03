@@ -1,0 +1,8 @@
+package gift.product.usecase;
+
+import gift.product.dto.OptionRequest;
+import gift.product.dto.OptionResponse;
+
+public interface CreateOptionUseCase {
+    OptionResponse execute(Long productId, OptionRequest request);
+}
