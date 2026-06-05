@@ -1,12 +1,12 @@
 package gift.product.controller;
 
-import gift.category.Category;
-import gift.category.CategoryRepository;
 import gift.product.dto.ProductRequest;
 import gift.product.dto.ProductResponse;
-import gift.product.entity.Product;
-import gift.product.repository.ProductRepository;
-import gift.product.validator.ProductNameValidator;
+import gift.product.usecase.CreateProductUseCase;
+import gift.product.usecase.DeleteProductUseCase;
+import gift.product.usecase.GetProductUseCase;
+import gift.product.usecase.GetProductsUseCase;
+import gift.product.usecase.UpdateProductUseCase;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,46 +22,48 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
-import java.util.List;
+import java.util.NoSuchElementException;
 
 @RestController
 @RequestMapping("/api/products")
 public class ProductController {
-    private final ProductRepository productRepository;
-    private final CategoryRepository categoryRepository;
+    private final GetProductsUseCase getProductsUseCase;
+    private final GetProductUseCase getProductUseCase;
+    private final CreateProductUseCase createProductUseCase;
+    private final UpdateProductUseCase updateProductUseCase;
+    private final DeleteProductUseCase deleteProductUseCase;
 
-    public ProductController(ProductRepository productRepository, CategoryRepository categoryRepository) {
-        this.productRepository = productRepository;
-        this.categoryRepository = categoryRepository;
+    public ProductController(
+        GetProductsUseCase getProductsUseCase,
+        GetProductUseCase getProductUseCase,
+        CreateProductUseCase createProductUseCase,
+        UpdateProductUseCase updateProductUseCase,
+        DeleteProductUseCase deleteProductUseCase
+    ) {
+        this.getProductsUseCase = getProductsUseCase;
+        this.getProductUseCase = getProductUseCase;
+        this.createProductUseCase = createProductUseCase;
+        this.updateProductUseCase = updateProductUseCase;
+        this.deleteProductUseCase = deleteProductUseCase;
     }
 
     @GetMapping
     public ResponseEntity<Page<ProductResponse>> getProducts(Pageable pageable) {
-        Page<ProductResponse> products = productRepository.findAll(pageable).map(ProductResponse::from);
-        return ResponseEntity.ok(products);
+        return ResponseEntity.ok(getProductsUseCase.execute(pageable));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ProductResponse> getProduct(@PathVariable Long id) {
-        Product product = productRepository.findById(id).orElse(null);
-        if (product == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(ProductResponse.from(product));
+        return getProductUseCase.execute(id)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping
     public ResponseEntity<ProductResponse> createProduct(@Valid @RequestBody ProductRequest request) {
-        validateName(request.name());
-
-        Category category = categoryRepository.findById(request.categoryId()).orElse(null);
-        if (category == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        Product saved = productRepository.save(request.toEntity(category));
-        return ResponseEntity.created(URI.create("/api/products/" + saved.getId()))
-            .body(ProductResponse.from(saved));
+        ProductResponse response = createProductUseCase.execute(request);
+        return ResponseEntity.created(URI.create("/api/products/" + response.id()))
+            .body(response);
     }
 
     @PutMapping("/{id}")
@@ -69,38 +71,24 @@ public class ProductController {
         @PathVariable Long id,
         @Valid @RequestBody ProductRequest request
     ) {
-        validateName(request.name());
-
-        Category category = categoryRepository.findById(request.categoryId()).orElse(null);
-        if (category == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        Product product = productRepository.findById(id).orElse(null);
-        if (product == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        product.update(request.name(), request.price(), request.imageUrl(), category);
-        Product saved = productRepository.save(product);
-        return ResponseEntity.ok(ProductResponse.from(saved));
+        return updateProductUseCase.execute(id, request)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
-        productRepository.deleteById(id);
+        deleteProductUseCase.execute(id);
         return ResponseEntity.noContent().build();
-    }
-
-    private void validateName(String name) {
-        List<String> errors = ProductNameValidator.validate(name);
-        if (!errors.isEmpty()) {
-            throw new IllegalArgumentException(String.join(", ", errors));
-        }
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<String> handleIllegalArgument(IllegalArgumentException e) {
         return ResponseEntity.badRequest().body(e.getMessage());
+    }
+
+    @ExceptionHandler(NoSuchElementException.class)
+    public ResponseEntity<Void> handleNoSuchElement() {
+        return ResponseEntity.notFound().build();
     }
 }
