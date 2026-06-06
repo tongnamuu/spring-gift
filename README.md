@@ -23,6 +23,16 @@ Spring Boot gift service for practicing production-like execution, automated ver
 
 ## Currently Identified Problems
 
+### Category Delete Rule
+
+`Category` is an aggregate root that can exist without any product. However, a category that is referenced by one or more products must not be deleted. This is a cross-aggregate deletion rule: the `Category` aggregate should not own or directly traverse `Product` objects, and the delete use case must check whether products reference the category before deleting it.
+
+Current policy:
+
+- Delete a category when no product references it.
+- Reject category deletion when any product references it.
+- Surface the rejection as a domain/API error instead of leaking a database FK exception.
+
 ### Delete Behavior And FK Constraints
 
 The Flyway schema defines foreign keys without `ON DELETE CASCADE`. In MySQL this means parent rows cannot be deleted while child rows still reference them. Current delete use cases must therefore define explicit domain rules instead of letting `DataIntegrityViolationException` leak from the database.

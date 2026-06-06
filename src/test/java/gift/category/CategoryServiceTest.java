@@ -1,5 +1,7 @@
 package gift.category;
 
+import gift.product.entity.Product;
+import gift.product.repository.ProductRepository;
 import gift.support.AbstractMysqlServiceTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,9 +14,11 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CategoryServiceTest extends AbstractMysqlServiceTest {
     private static final String TEST_CATEGORY_PREFIX = "service-test-";
+    private static final String TEST_PRODUCT_PREFIX = "cat-del-";
 
     @Autowired
     private CreateCategoryService createCategoryService;
@@ -30,6 +34,9 @@ class CategoryServiceTest extends AbstractMysqlServiceTest {
 
     @Autowired
     private CategoryRepository categoryRepository;
+
+    @Autowired
+    private ProductRepository productRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -135,6 +142,19 @@ class CategoryServiceTest extends AbstractMysqlServiceTest {
         assertThat(categoryRepository.existsById(category.getId())).isFalse();
     }
 
+    @Test
+    void deleteCategoryRejectsCategoryReferencedByProduct() {
+        Category category = saveCategory(TEST_CATEGORY_PREFIX + "delete-referenced");
+        Product product = saveProduct(TEST_PRODUCT_PREFIX + "ref", category);
+
+        assertThatThrownBy(() -> deleteCategoryService.execute(category.getId()))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("상품이 있는 카테고리는 삭제할 수 없습니다.");
+
+        assertThat(categoryRepository.existsById(category.getId())).isTrue();
+        assertThat(productRepository.existsById(product.getId())).isTrue();
+    }
+
     private Category saveCategory(String name) {
         return categoryRepository.save(new Category(
             name,
@@ -144,7 +164,17 @@ class CategoryServiceTest extends AbstractMysqlServiceTest {
         ));
     }
 
+    private Product saveProduct(String name, Category category) {
+        return productRepository.save(new Product(
+            name,
+            1_000,
+            "https://example.com/category-product.png",
+            category
+        ));
+    }
+
     private void deleteTestCategories() {
+        jdbcTemplate.update("delete from product where name like ?", TEST_PRODUCT_PREFIX + "%");
         jdbcTemplate.update("delete from category where name like ?", TEST_CATEGORY_PREFIX + "%");
     }
 }
