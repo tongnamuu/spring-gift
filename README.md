@@ -9,7 +9,8 @@ Spring Boot gift service for practicing production-like execution, automated ver
 - Flyway migrations are in `src/main/resources/db/migration`.
 - Thymeleaf admin templates are in `src/main/resources/templates`.
 - Docker Compose MySQL setup uses MySQL 8.4.9 LTS in `compose.yaml`.
-- Baseline `./gradlew test` currently succeeds, but there are no real test classes yet.
+- Baseline `./gradlew test`, `./gradlew serviceTest`, and `./gradlew apiTest` currently succeed.
+- API tests now cover category deletion policy, admin product missing-category display, and member registration/login behavior.
 - Controllers currently contain most business logic; service extraction is still pending.
 
 ## Implementation Strategy
@@ -50,6 +51,28 @@ Most remaining Flyway foreign keys are defined without `ON DELETE CASCADE`. In M
 | `Order` | No current delete API. | No delete behavior has been defined. | Decide whether orders are immutable history. |
 
 Related behavior gap: order creation currently has a documented intent to remove the ordered product from the buyer's wishes, but this still needs runtime verification and may leave wish rows that later block product or member deletion.
+
+## Member Registration And Login
+
+Member registration and login are still implemented directly in `MemberController`. Current API tests verify the observable behavior against the real MySQL test database.
+
+Current behavior:
+
+- `POST /api/members/register` returns `201 Created` with a JWT when a new email is registered.
+- Sequential duplicate registration returns `400 Bad Request` with `Email is already registered.`.
+- Login with a registered email and matching password returns `200 OK` with a JWT.
+- Login with a missing member or wrong password returns `400 Bad Request` with `Invalid email or password.`.
+- Invalid email format on registration returns `400 Bad Request`.
+
+Concurrent duplicate registration is not yet handled as a domain-level error. When multiple requests register the same new email at the same time, the database unique constraint keeps only one row, but at least one losing request can return `500 Internal Server Error`. The observed 500 response body contains Spring's default error value `"error":"Internal Server Error"` instead of a member-domain message.
+
+Expected policy to define before refactoring:
+
+- Keep the database unique constraint on `member.email`.
+- Convert duplicate-email persistence failures into the same API contract as the sequential duplicate case.
+- Prefer `400 Bad Request` with `Email is already registered.` unless a different duplicate-registration contract is explicitly chosen.
+
+## Runtime Verification Notes
 
 Earlier runtime verification on the local application confirmed that FK failures surfaced as `500 Internal Server Error` responses instead of domain-level API errors before the category policy changed:
 
@@ -144,7 +167,9 @@ Required Kakao consent items:
 - `docker compose up -d mysql` - passed; MySQL became healthy.
 - `./gradlew bootRun` - passed; application started on port 8080.
 - `curl http://localhost:8080/api/categories` - passed; returned seeded categories.
-- `./gradlew test` - passed; no real test classes yet.
+- `./gradlew test --rerun-tasks` - passed with current contract unit tests.
+- `./gradlew serviceTest --rerun-tasks` - passed against Docker Compose MySQL test database.
+- `./gradlew apiTest --rerun-tasks` - passed; includes member registration/login tests and current concurrent duplicate-registration behavior.
 - Cucumber feature files added under `src/test/resources/features`; step definitions and runner are not configured yet.
 - `./gradlew build` - pending before final handoff.
 
@@ -154,3 +179,4 @@ Required Kakao consent items:
 - Database setup: selected MySQL 8.4.9 LTS after checking MySQL lifecycle and Spring Boot-managed Connector/J compatibility.
 - Black-box test design: organized current API behavior into Cucumber feature files for member, category, product, option, wish, and order workflows.
 - Runtime environment setup: added `.env.example`, documented local `.env` usage, MySQL startup, and Kakao Login consent items.
+- Member API behavior analysis: added tests for registration/login success and failure cases, and documented that concurrent duplicate registration currently surfaces as a `500 Internal Server Error`.
