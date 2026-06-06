@@ -50,7 +50,7 @@ class MemberApiTest extends AbstractMysqlApiTest {
     }
 
     @Test
-    void registerReturnsCreatedTokenAndPersistsMember() {
+    void registerReturnsOkTokenAndPersistsMember() {
         MemberRequest request = new MemberRequest(TEST_EMAIL_PREFIX + "register@example.com", "password123");
 
         ResponseEntity<TokenResponse> response = restTemplate.postForEntity(
@@ -59,7 +59,7 @@ class MemberApiTest extends AbstractMysqlApiTest {
             TokenResponse.class
         );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().token()).isNotBlank();
         assertThat(jwtProvider.getEmail(response.getBody().token())).isEqualTo(request.email());
@@ -84,17 +84,22 @@ class MemberApiTest extends AbstractMysqlApiTest {
     }
 
     @Test
-    void concurrentDuplicateRegisterReturnsServerErrorForCurrentImplementation() throws Exception {
+    void concurrentDuplicateRegisterReturnsBadRequest() throws Exception {
         MemberRequest request = new MemberRequest(TEST_EMAIL_PREFIX + "concurrent-duplicate@example.com", "password123");
 
         List<ResponseEntity<String>> responses = postRegisterConcurrently(request, 32);
         List<HttpStatusCode> statusCodes = responses.stream()
             .map(ResponseEntity::getStatusCode)
             .toList();
+        long successCount = statusCodes.stream()
+            .filter(HttpStatus.OK::equals)
+            .count();
 
-        assertThat(statusCodes).contains(HttpStatus.CREATED, HttpStatus.INTERNAL_SERVER_ERROR);
-        assertThat(findResponseBodyByStatus(responses, HttpStatus.INTERNAL_SERVER_ERROR))
-            .contains("\"error\":\"Internal Server Error\"");
+        assertThat(successCount).isEqualTo(1L);
+        assertThat(statusCodes).contains(HttpStatus.BAD_REQUEST);
+        assertThat(statusCodes).doesNotContain(HttpStatus.INTERNAL_SERVER_ERROR);
+        assertThat(findResponseBodyByStatus(responses, HttpStatus.BAD_REQUEST))
+            .isEqualTo("Email is already registered.");
         assertThat(countMembersByEmail(request.email())).isEqualTo(1L);
     }
 
@@ -143,10 +148,21 @@ class MemberApiTest extends AbstractMysqlApiTest {
     }
 
     @Test
-    void registerReturnsBadRequestWhenEmailIsInvalid() {
+    void registerReturnsBadRequestWhenRequestEmailIsInvalid() {
         ResponseEntity<String> response = restTemplate.postForEntity(
             "/api/members/register",
             new MemberRequest("not-an-email", "password123"),
+            String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void registerReturnsBadRequestWhenRequestPasswordIsBlank() {
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/api/members/register",
+            new MemberRequest(TEST_EMAIL_PREFIX + "blank-password@example.com", " "),
             String.class
         );
 

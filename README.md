@@ -58,19 +58,20 @@ Member registration and login are still implemented directly in `MemberControlle
 
 Current behavior:
 
-- `POST /api/members/register` returns `201 Created` with a JWT when a new email is registered.
+- `POST /api/members/register` returns `200 OK` with a JWT when a new email is registered.
 - Sequential duplicate registration returns `400 Bad Request` with `Email is already registered.`.
+- Concurrent duplicate registration also returns `400 Bad Request` with `Email is already registered.` for losing requests.
 - Login with a registered email and matching password returns `200 OK` with a JWT.
 - Login with a missing member or wrong password returns `400 Bad Request` with `Invalid email or password.`.
 - Invalid email format on registration returns `400 Bad Request`.
 
-Concurrent duplicate registration is not yet handled as a domain-level error. When multiple requests register the same new email at the same time, the database unique constraint keeps only one row, but at least one losing request can return `500 Internal Server Error`. The observed 500 response body contains Spring's default error value `"error":"Internal Server Error"` instead of a member-domain message.
+Concurrent duplicate registration is handled at the service boundary. The database unique constraint keeps only one member row for an email, and persistence-level duplicate-email failures are converted to the same API contract as the sequential duplicate case.
 
-Expected policy to define before refactoring:
+Current policy:
 
 - Keep the database unique constraint on `member.email`.
-- Convert duplicate-email persistence failures into the same API contract as the sequential duplicate case.
-- Prefer `400 Bad Request` with `Email is already registered.` unless a different duplicate-registration contract is explicitly chosen.
+- Mark `Member.email` as unique in the JPA mapping.
+- Convert duplicate-email persistence failures into `400 Bad Request` with `Email is already registered.`.
 
 ## Runtime Verification Notes
 
@@ -169,7 +170,7 @@ Required Kakao consent items:
 - `curl http://localhost:8080/api/categories` - passed; returned seeded categories.
 - `./gradlew test --rerun-tasks` - passed with current contract unit tests.
 - `./gradlew serviceTest --rerun-tasks` - passed against Docker Compose MySQL test database.
-- `./gradlew apiTest --rerun-tasks` - passed; includes member registration/login tests and current concurrent duplicate-registration behavior.
+- `./gradlew apiTest --rerun-tasks` - passed; includes member registration/login tests and concurrent duplicate-registration handling.
 - Cucumber feature files added under `src/test/resources/features`; step definitions and runner are not configured yet.
 - `./gradlew build` - pending before final handoff.
 
@@ -179,4 +180,4 @@ Required Kakao consent items:
 - Database setup: selected MySQL 8.4.9 LTS after checking MySQL lifecycle and Spring Boot-managed Connector/J compatibility.
 - Black-box test design: organized current API behavior into Cucumber feature files for member, category, product, option, wish, and order workflows.
 - Runtime environment setup: added `.env.example`, documented local `.env` usage, MySQL startup, and Kakao Login consent items.
-- Member API behavior analysis: added tests for registration/login success and failure cases, and documented that concurrent duplicate registration currently surfaces as a `500 Internal Server Error`.
+- Member API behavior analysis: added tests for registration/login success and failure cases, then changed concurrent duplicate registration to return `400 Bad Request` with the duplicate-email message.
