@@ -21,6 +21,34 @@ Spring Boot gift service for practicing production-like execution, automated ver
 - Do not skip or disable tests to make a change pass.
 - Verify behavior through observable results, not only absence of exceptions.
 
+## Currently Identified Problems
+
+### Delete Behavior And FK Constraints
+
+The Flyway schema defines foreign keys without `ON DELETE CASCADE`. In MySQL this means parent rows cannot be deleted while child rows still reference them. Current delete use cases must therefore define explicit domain rules instead of letting `DataIntegrityViolationException` leak from the database.
+
+| Target object | Direct FK dependencies | Current risk | Expected policy to define |
+| --- | --- | --- | --- |
+| `Category` | `product.category_id -> category.id` | Deleting a category that still has products will fail at the database level. | Reject category deletion while products exist. |
+| `Product` | `wish.product_id -> product.id`, `options.product_id -> product.id` | Wishes block product deletion. Options may be removed through the product aggregate, but ordered options are still blocked by orders. | Reject product deletion while wishes or orders exist for the product. |
+| `Option` | `orders.option_id -> options.id` | Deleting an option that was ordered will fail at the database level. | Reject option deletion while orders reference it; also keep the existing rule that a product needs at least one option. |
+| `Member` | `wish.member_id -> member.id`, `orders.member_id -> member.id` | Deleting a member with wishes or orders will fail at the database level. | Define whether wishes are cleaned up, but reject deletion when order history exists. |
+| `Wish` | None currently identified. | Wish deletion is the lowest FK risk, but ownership validation must remain explicit. | Allow deletion only by the owning member. |
+| `Order` | No current delete API. | No delete behavior has been defined. | Decide whether orders are immutable history. |
+
+Related behavior gap: order creation currently has a documented intent to remove the ordered product from the buyer's wishes, but this still needs runtime verification and may leave wish rows that later block product or member deletion.
+
+Runtime verification on the local application confirmed that FK failures currently surface as `500 Internal Server Error` responses instead of domain-level API errors:
+
+| Request | Observed response | Runtime exception | FK constraint |
+| --- | --- | --- | --- |
+| `DELETE /api/categories/1` | `500 Internal Server Error` | `DataIntegrityViolationException` from `SQLIntegrityConstraintViolationException` | `product.category_id -> category.id` (`product_ibfk_1`) |
+| `DELETE /api/products/1` | `500 Internal Server Error` | `DataIntegrityViolationException` from `SQLIntegrityConstraintViolationException` | `wish.product_id -> product.id` (`wish_ibfk_2`) |
+| `DELETE /api/products/2/options/3` | `500 Internal Server Error` | `DataIntegrityViolationException` from `SQLIntegrityConstraintViolationException` | `orders.option_id -> options.id` (`orders_ibfk_1`) |
+| `POST /admin/members/2/delete` | `500 Internal Server Error` | `DataIntegrityViolationException` from `SQLIntegrityConstraintViolationException` | `orders.member_id -> member.id` (`orders_ibfk_2`) |
+
+Application startup itself succeeds against local MySQL. The remaining startup warnings are Flyway's MySQL 8.4 support warning and Spring's default `open-in-view` warning.
+
 ## Commit Prompt Hook
 
 This checkout uses `scripts/git-hooks` as `core.hooksPath`. Before committing work done through AI prompts, record each user prompt with:
