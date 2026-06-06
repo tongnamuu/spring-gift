@@ -60,7 +60,7 @@ ktlint {
 
 tasks.test {
     useJUnitPlatform {
-        excludeTags("service")
+        excludeTags("service", "api")
     }
 }
 
@@ -74,5 +74,18 @@ tasks.register<Test>("serviceTest") {
     shouldRunAfter(tasks.test)
     useJUnitPlatform {
         includeTags("service")
+    }
+}
+
+tasks.register<Test>("apiTest") {
+    val testSourceSet = sourceSets.test.get()
+
+    group = "verification"
+    description = "Runs API tests against the MySQL database from Docker Compose."
+    testClassesDirs = testSourceSet.output.classesDirs
+    classpath = testSourceSet.runtimeClasspath
+    shouldRunAfter("serviceTest")
+    useJUnitPlatform {
+        includeTags("api")
     }
 }

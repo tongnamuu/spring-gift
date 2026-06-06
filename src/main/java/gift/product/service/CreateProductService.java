@@ -1,6 +1,5 @@
 package gift.product.service;
 
-import gift.category.Category;
 import gift.category.CategoryRepository;
 import gift.product.dto.ProductRequest;
 import gift.product.dto.ProductResponse;
@@ -27,9 +26,10 @@ public class CreateProductService implements CreateProductUseCase {
     @Transactional
     public ProductResponse execute(ProductRequest request) {
         validateName(request.name());
-        Category category = categoryRepository.findById(request.categoryId())
-            .orElseThrow(() -> new NoSuchElementException("카테고리가 존재하지 않습니다. id=" + request.categoryId()));
-        return ProductResponse.from(productRepository.save(request.toEntity(category)));
+        if (!categoryRepository.existsById(request.categoryId())) {
+            throw new NoSuchElementException("카테고리가 존재하지 않습니다. id=" + request.categoryId());
+        }
+        return ProductResponse.from(productRepository.save(request.toEntity()));
     }
 
     private void validateName(String name) {

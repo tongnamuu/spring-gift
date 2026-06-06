@@ -14,7 +14,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/admin/products")
@@ -30,6 +32,7 @@ public class AdminProductController {
     @GetMapping
     public String list(Model model) {
         model.addAttribute("products", productRepository.findAll());
+        model.addAttribute("categoryNames", categoryNames());
         return "product/list";
     }
 
@@ -53,9 +56,10 @@ public class AdminProductController {
             return "product/new";
         }
 
-        Category category = categoryRepository.findById(categoryId)
-            .orElseThrow(() -> new NoSuchElementException("카테고리가 존재하지 않습니다. id=" + categoryId));
-        productRepository.save(new Product(name, price, imageUrl, category));
+        if (!categoryRepository.existsById(categoryId)) {
+            throw new NoSuchElementException("카테고리가 존재하지 않습니다. id=" + categoryId);
+        }
+        productRepository.save(new Product(name, price, imageUrl, categoryId));
         return "redirect:/admin/products";
     }
 
@@ -86,10 +90,11 @@ public class AdminProductController {
             return "product/edit";
         }
 
-        Category category = categoryRepository.findById(categoryId)
-            .orElseThrow(() -> new NoSuchElementException("카테고리가 존재하지 않습니다. id=" + categoryId));
+        if (!categoryRepository.existsById(categoryId)) {
+            throw new NoSuchElementException("카테고리가 존재하지 않습니다. id=" + categoryId);
+        }
 
-        product.update(name, price, imageUrl, category);
+        product.update(name, price, imageUrl, categoryId);
         productRepository.save(product);
         return "redirect:/admin/products";
     }
@@ -132,5 +137,10 @@ public class AdminProductController {
         model.addAttribute("imageUrl", imageUrl);
         model.addAttribute("categoryId", categoryId);
         model.addAttribute("categories", categoryRepository.findAll());
+    }
+
+    private Map<Long, String> categoryNames() {
+        return categoryRepository.findAll().stream()
+            .collect(Collectors.toMap(Category::getId, Category::getName));
     }
 }

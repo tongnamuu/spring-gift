@@ -145,7 +145,7 @@ class CategoryServiceTest extends AbstractMysqlServiceTest {
     @Test
     void deleteCategoryRejectsCategoryReferencedByProduct() {
         Category category = saveCategory(TEST_CATEGORY_PREFIX + "delete-referenced");
-        Product product = saveProduct(TEST_PRODUCT_PREFIX + "ref", category);
+        Product product = saveProduct(TEST_PRODUCT_PREFIX + "ref", category.getId());
 
         assertThatThrownBy(() -> deleteCategoryService.execute(category.getId()))
             .isInstanceOf(IllegalArgumentException.class)
@@ -164,12 +164,12 @@ class CategoryServiceTest extends AbstractMysqlServiceTest {
         ));
     }
 
-    private Product saveProduct(String name, Category category) {
+    private Product saveProduct(String name, Long categoryId) {
         return productRepository.save(new Product(
             name,
             1_000,
             "https://example.com/category-product.png",
-            category
+            categoryId
         ));
     }
 

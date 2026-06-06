@@ -25,7 +25,9 @@ Spring Boot gift service for practicing production-like execution, automated ver
 
 ### Category Delete Rule
 
-`Category` is an aggregate root that can exist without any product. However, a category that is referenced by one or more products must not be deleted. This is a cross-aggregate deletion rule: the `Category` aggregate should not own or directly traverse `Product` objects, and the delete use case must check whether products reference the category before deleting it.
+`Category` and `Product` are separate aggregate roots. `Category` can exist without any product, and `Product` stores only the `categoryId` value instead of holding a direct `Category` object reference.
+
+A category that is referenced by one or more products must not be deleted. This is a cross-aggregate deletion rule: the `Category` aggregate should not own or directly traverse `Product` objects, and the delete use case must check whether products reference the category before deleting it.
 
 Current policy:
 

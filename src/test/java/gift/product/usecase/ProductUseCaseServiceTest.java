@@ -91,21 +91,22 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
 
     @Test
     void getProductReturnsPersistedProduct() {
-        Product product = saveProduct(TEST_PRODUCT_PREFIX + "get", saveCategory(TEST_CATEGORY_PREFIX + "get"));
+        Category category = saveCategory(TEST_CATEGORY_PREFIX + "get");
+        Product product = saveProduct(TEST_PRODUCT_PREFIX + "get", category.getId());
 
         Optional<ProductResponse> response = getProductUseCase.execute(product.getId());
 
         assertThat(response).isPresent();
         assertThat(response.orElseThrow().id()).isEqualTo(product.getId());
         assertThat(response.orElseThrow().name()).isEqualTo(product.getName());
-        assertThat(response.orElseThrow().categoryId()).isEqualTo(product.getCategory().getId());
+        assertThat(response.orElseThrow().categoryId()).isEqualTo(product.getCategoryId());
     }
 
     @Test
     void getProductsReturnsPersistedProducts() {
         Category category = saveCategory(TEST_CATEGORY_PREFIX + "list");
-        Product first = saveProduct(TEST_PRODUCT_PREFIX + "list-first", category);
-        Product second = saveProduct(TEST_PRODUCT_PREFIX + "list-second", category);
+        Product first = saveProduct(TEST_PRODUCT_PREFIX + "list-first", category.getId());
+        Product second = saveProduct(TEST_PRODUCT_PREFIX + "list-second", category.getId());
 
         Page<ProductResponse> response = getProductsUseCase.execute(PageRequest.of(0, 20));
 
@@ -119,7 +120,8 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
 
     @Test
     void updateProductChangesPersistedProduct() {
-        Product product = saveProduct(TEST_PRODUCT_PREFIX + "update-before", saveCategory(TEST_CATEGORY_PREFIX + "before"));
+        Category category = saveCategory(TEST_CATEGORY_PREFIX + "before");
+        Product product = saveProduct(TEST_PRODUCT_PREFIX + "update-before", category.getId());
         Category newCategory = saveCategory(TEST_CATEGORY_PREFIX + "after");
         ProductRequest request = new ProductRequest(
             TEST_PRODUCT_PREFIX + "update-after",
@@ -139,12 +141,13 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
         assertThat(persisted.getName()).isEqualTo(request.name());
         assertThat(persisted.getPrice()).isEqualTo(request.price());
         assertThat(persisted.getImageUrl()).isEqualTo(request.imageUrl());
-        assertThat(persisted.getCategory().getId()).isEqualTo(newCategory.getId());
+        assertThat(persisted.getCategoryId()).isEqualTo(newCategory.getId());
     }
 
     @Test
     void deleteProductRemovesPersistedProduct() {
-        Product product = saveProduct(TEST_PRODUCT_PREFIX + "delete", saveCategory(TEST_CATEGORY_PREFIX + "delete"));
+        Category category = saveCategory(TEST_CATEGORY_PREFIX + "delete");
+        Product product = saveProduct(TEST_PRODUCT_PREFIX + "delete", category.getId());
 
         deleteProductUseCase.execute(product.getId());
 
@@ -160,12 +163,12 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
         ));
     }
 
-    private Product saveProduct(String name, Category category) {
+    private Product saveProduct(String name, Long categoryId) {
         return productRepository.save(new Product(
             name,
             10000,
             "https://example.com/product.png",
-            category
+            categoryId
         ));
     }
 

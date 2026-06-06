@@ -26,12 +26,14 @@ public class UpdateProductService implements UpdateProductUseCase {
     @Transactional
     public Optional<ProductResponse> execute(Long id, ProductRequest request) {
         validateName(request.name());
-        return categoryRepository.findById(request.categoryId())
-            .flatMap(category -> productRepository.findById(id)
-                .map(product -> {
-                    product.update(request.name(), request.price(), request.imageUrl(), category);
-                    return ProductResponse.from(productRepository.save(product));
-                }));
+        if (!categoryRepository.existsById(request.categoryId())) {
+            return Optional.empty();
+        }
+        return productRepository.findById(id)
+            .map(product -> {
+                product.update(request.name(), request.price(), request.imageUrl(), request.categoryId());
+                return ProductResponse.from(productRepository.save(product));
+            });
     }
 
     private void validateName(String name) {

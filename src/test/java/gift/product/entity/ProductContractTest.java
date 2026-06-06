@@ -1,6 +1,5 @@
 package gift.product.entity;
 
-import gift.category.Category;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -8,43 +7,35 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ProductContractTest {
     @Test
-    void productCanExistWithCategory() {
-        Category category = category();
-
+    void productReferencesCategoryById() {
         Product product = new Product(
             "테스트 상품",
             10000,
             "https://example.com/product.png",
-            category
+            1L
         );
 
         assertThat(product.getName()).isEqualTo("테스트 상품");
         assertThat(product.getPrice()).isEqualTo(10000);
         assertThat(product.getImageUrl()).isEqualTo("https://example.com/product.png");
-        assertThat(product.getCategory()).isSameAs(category);
+        assertThat(product.getCategoryId()).isEqualTo(1L);
     }
 
     @Test
     void updateChangesProductAttributes() {
         Product product = product("기존 상품");
-        Category newCategory = new Category(
-            "변경 카테고리",
-            "#222222",
-            "https://example.com/new-category.png",
-            "new category"
-        );
 
         product.update(
             "변경 상품",
             20000,
             "https://example.com/new-product.png",
-            newCategory
+            2L
         );
 
         assertThat(product.getName()).isEqualTo("변경 상품");
         assertThat(product.getPrice()).isEqualTo(20000);
         assertThat(product.getImageUrl()).isEqualTo("https://example.com/new-product.png");
-        assertThat(product.getCategory()).isSameAs(newCategory);
+        assertThat(product.getCategoryId()).isEqualTo(2L);
     }
 
     @Test
@@ -107,16 +98,7 @@ class ProductContractTest {
             name,
             10000,
             "https://example.com/product.png",
-            category()
-        );
-    }
-
-    private Category category() {
-        return new Category(
-            "테스트 카테고리",
-            "#111111",
-            "https://example.com/category.png",
-            "test category"
+            1L
         );
     }
 }

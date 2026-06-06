@@ -143,7 +143,7 @@ class ProductOptionUseCaseServiceTest extends AbstractMysqlServiceTest {
             name,
             10000,
             "https://example.com/product.png",
-            category
+            category.getId()
         ));
     }
 
