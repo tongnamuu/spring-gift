@@ -1,4 +1,4 @@
-package gift.category;
+package gift.category.domain;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 

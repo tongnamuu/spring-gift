@@ -1,5 +1,9 @@
-package gift.category;
+package gift.category.controller;
 
+import gift.category.usecase.CreateCategoryUseCase;
+import gift.category.usecase.DeleteCategoryUseCase;
+import gift.category.usecase.GetCategoriesUseCase;
+import gift.category.usecase.UpdateCategoryUseCase;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;

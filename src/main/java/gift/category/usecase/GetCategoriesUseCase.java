@@ -1,4 +1,6 @@
-package gift.category;
+package gift.category.usecase;
+
+import gift.category.controller.CategoryResponse;
 
 import java.util.List;
 

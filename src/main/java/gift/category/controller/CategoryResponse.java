@@ -1,4 +1,6 @@
-package gift.category;
+package gift.category.controller;
+
+import gift.category.domain.Category;
 
 public record CategoryResponse(
     Long id,

@@ -1,5 +1,8 @@
-package gift.category;
+package gift.category.service;
 
+import gift.category.controller.CategoryResponse;
+import gift.category.domain.CategoryRepository;
+import gift.category.usecase.GetCategoriesUseCase;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

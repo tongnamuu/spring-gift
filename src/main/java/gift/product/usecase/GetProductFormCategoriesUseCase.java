@@ -1,6 +1,6 @@
 package gift.product.usecase;
 
-import gift.category.Category;
+import gift.category.domain.Category;
 
 import java.util.List;
 

@@ -1,5 +1,7 @@
-package gift.category;
+package gift.category.domain;
 
+import gift.category.controller.CategoryRequest;
+import gift.category.controller.CategoryResponse;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;

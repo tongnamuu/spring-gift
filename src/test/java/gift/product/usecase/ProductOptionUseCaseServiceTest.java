@@ -1,7 +1,7 @@
 package gift.product.usecase;
 
-import gift.category.Category;
-import gift.category.CategoryRepository;
+import gift.category.domain.Category;
+import gift.category.domain.CategoryRepository;
 import gift.product.dto.OptionRequest;
 import gift.product.dto.OptionResponse;
 import gift.product.entity.Option;

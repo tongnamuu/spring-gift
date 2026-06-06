@@ -1,7 +1,7 @@
 package gift.product.controller;
 
-import gift.category.Category;
-import gift.category.CategoryRepository;
+import gift.category.domain.Category;
+import gift.category.domain.CategoryRepository;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
 import gift.product.validator.ProductNameValidator;

@@ -1,5 +1,9 @@
-package gift.category;
+package gift.category.service;
 
+import gift.category.controller.CategoryRequest;
+import gift.category.controller.CategoryResponse;
+import gift.category.domain.Category;
+import gift.category.domain.CategoryRepository;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
 import gift.support.AbstractMysqlServiceTest;
