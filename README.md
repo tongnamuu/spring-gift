@@ -27,21 +27,22 @@ Spring Boot gift service for practicing production-like execution, automated ver
 
 `Category` and `Product` are separate aggregate roots. `Category` can exist without any product, and `Product` stores only the `categoryId` value instead of holding a direct `Category` object reference.
 
-A category that is referenced by one or more products must not be deleted. This is a cross-aggregate deletion rule: the `Category` aggregate should not own or directly traverse `Product` objects, and the delete use case must check whether products reference the category before deleting it.
+Category deletion is independent from product lifecycle. Deleting a category does not move or delete products that contain the deleted category id. Product listing code must resolve category names separately and display `미분류 카테고리` when the category row no longer exists.
 
 Current policy:
 
-- Delete a category when no product references it.
-- Reject category deletion when any product references it.
-- Surface the rejection as a domain/API error instead of leaking a database FK exception.
+- Delete a category regardless of product references.
+- Keep existing products and their `categoryId` values unchanged.
+- Display products with missing category rows as `미분류 카테고리` in product lists.
+- `DELETE /api/categories/{id}` returns `204 No Content` even when products still contain that category id.
 
 ### Delete Behavior And FK Constraints
 
-The Flyway schema defines foreign keys without `ON DELETE CASCADE`. In MySQL this means parent rows cannot be deleted while child rows still reference them. Current delete use cases must therefore define explicit domain rules instead of letting `DataIntegrityViolationException` leak from the database.
+Most remaining Flyway foreign keys are defined without `ON DELETE CASCADE`. In MySQL this means parent rows cannot be deleted while child rows still reference them. Current delete use cases must therefore define explicit domain rules instead of letting `DataIntegrityViolationException` leak from the database.
 
 | Target object | Direct FK dependencies | Current risk | Expected policy to define |
 | --- | --- | --- | --- |
-| `Category` | `product.category_id -> category.id` | Deleting a category that still has products will fail at the database level. | Reject category deletion while products exist. |
+| `Category` | `Product.categoryId` value reference only; no DB FK after `V3__Remove_product_category_foreign_key.sql`. | Products can keep a category id whose category row was deleted. | Allow category deletion and display missing category rows as `미분류 카테고리`. |
 | `Product` | `wish.product_id -> product.id`, `options.product_id -> product.id` | Wishes block product deletion. Options may be removed through the product aggregate, but ordered options are still blocked by orders. | Reject product deletion while wishes or orders exist for the product. |
 | `Option` | `orders.option_id -> options.id` | Deleting an option that was ordered will fail at the database level. | Reject option deletion while orders reference it; also keep the existing rule that a product needs at least one option. |
 | `Member` | `wish.member_id -> member.id`, `orders.member_id -> member.id` | Deleting a member with wishes or orders will fail at the database level. | Define whether wishes are cleaned up, but reject deletion when order history exists. |
@@ -50,7 +51,7 @@ The Flyway schema defines foreign keys without `ON DELETE CASCADE`. In MySQL thi
 
 Related behavior gap: order creation currently has a documented intent to remove the ordered product from the buyer's wishes, but this still needs runtime verification and may leave wish rows that later block product or member deletion.
 
-Runtime verification on the local application confirmed that FK failures currently surface as `500 Internal Server Error` responses instead of domain-level API errors:
+Earlier runtime verification on the local application confirmed that FK failures surfaced as `500 Internal Server Error` responses instead of domain-level API errors before the category policy changed:
 
 | Request | Observed response | Runtime exception | FK constraint |
 | --- | --- | --- | --- |

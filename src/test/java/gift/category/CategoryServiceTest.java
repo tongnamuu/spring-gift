@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CategoryServiceTest extends AbstractMysqlServiceTest {
     private static final String TEST_CATEGORY_PREFIX = "service-test-";
@@ -143,16 +142,15 @@ class CategoryServiceTest extends AbstractMysqlServiceTest {
     }
 
     @Test
-    void deleteCategoryRejectsCategoryReferencedByProduct() {
+    void deleteCategoryKeepsProductWithMissingCategoryReference() {
         Category category = saveCategory(TEST_CATEGORY_PREFIX + "delete-referenced");
         Product product = saveProduct(TEST_PRODUCT_PREFIX + "ref", category.getId());
 
-        assertThatThrownBy(() -> deleteCategoryService.execute(category.getId()))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("상품이 있는 카테고리는 삭제할 수 없습니다.");
+        deleteCategoryService.execute(category.getId());
 
-        assertThat(categoryRepository.existsById(category.getId())).isTrue();
-        assertThat(productRepository.existsById(product.getId())).isTrue();
+        assertThat(categoryRepository.existsById(category.getId())).isFalse();
+        Product persistedProduct = productRepository.findById(product.getId()).orElseThrow();
+        assertThat(persistedProduct.getCategoryId()).isEqualTo(category.getId());
     }
 
     private Category saveCategory(String name) {

@@ -58,22 +58,22 @@ class CategoryApiTest extends AbstractMysqlApiTest {
     }
 
     @Test
-    void deleteCategoryReturnsBadRequestWhenProductReferencesCategory() {
+    void deleteCategoryReturnsNoContentAndKeepsProductWhenProductReferencesCategory() {
         Category category = saveCategory(TEST_CATEGORY_PREFIX + "delete-referenced");
         Product product = saveProduct(TEST_PRODUCT_PREFIX + "ref", category.getId());
 
-        ResponseEntity<String> response = restTemplate.exchange(
+        ResponseEntity<Void> response = restTemplate.exchange(
             "/api/categories/{id}",
             HttpMethod.DELETE,
             null,
-            String.class,
+            Void.class,
             category.getId()
         );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody()).isEqualTo("상품이 있는 카테고리는 삭제할 수 없습니다.");
-        assertThat(categoryRepository.existsById(category.getId())).isTrue();
-        assertThat(productRepository.existsById(product.getId())).isTrue();
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(categoryRepository.existsById(category.getId())).isFalse();
+        Product persistedProduct = productRepository.findById(product.getId()).orElseThrow();
+        assertThat(persistedProduct.getCategoryId()).isEqualTo(category.getId());
     }
 
     private Category saveCategory(String name) {
