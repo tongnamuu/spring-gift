@@ -2,7 +2,7 @@ package gift.product.controller;
 
 import gift.product.dto.OptionRequest;
 import gift.product.dto.OptionResponse;
-import gift.product.usecase.OptionCommand;
+import gift.product.dto.OptionCommand;
 import gift.product.usecase.CreateOptionUseCase;
 import gift.product.usecase.DeleteOptionUseCase;
 import gift.product.usecase.GetOptionsUseCase;

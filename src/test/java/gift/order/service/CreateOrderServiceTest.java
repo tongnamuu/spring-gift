@@ -4,7 +4,7 @@ import gift.member.domain.Member;
 import gift.member.domain.MemberRepository;
 import gift.order.domain.Order;
 import gift.order.domain.OrderRepository;
-import gift.order.usecase.OrderCommand;
+import gift.order.dto.OrderCommand;
 import gift.product.entity.Option;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;

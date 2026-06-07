@@ -5,7 +5,7 @@ import gift.member.auth.TokenResponse;
 import gift.member.domain.Member;
 import gift.member.domain.MemberRepository;
 import gift.member.usecase.auth.LoginMemberUseCase;
-import gift.member.usecase.auth.MemberCredentialsCommand;
+import gift.member.dto.MemberCredentialsCommand;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

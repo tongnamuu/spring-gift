@@ -5,7 +5,7 @@ import gift.member.auth.KakaoLoginClient;
 import gift.member.auth.TokenResponse;
 import gift.member.domain.Member;
 import gift.member.domain.MemberRepository;
-import gift.member.usecase.auth.KakaoAuthorizationCodeCommand;
+import gift.member.dto.KakaoAuthorizationCodeCommand;
 import gift.member.usecase.auth.LoginWithKakaoUseCase;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

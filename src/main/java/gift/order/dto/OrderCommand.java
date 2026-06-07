@@ -1,4 +1,4 @@
-package gift.order.usecase;
+package gift.order.dto;
 
 public record OrderCommand(
     Long optionId,

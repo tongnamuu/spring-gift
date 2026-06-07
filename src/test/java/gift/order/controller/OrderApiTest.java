@@ -13,7 +13,7 @@ import gift.product.dto.OptionResponse;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
 import gift.product.usecase.CreateOptionUseCase;
-import gift.product.usecase.OptionCommand;
+import gift.product.dto.OptionCommand;
 import gift.product.vo.OptionName;
 import gift.support.AbstractMysqlApiTest;
 import gift.wish.domain.Wish;

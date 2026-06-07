@@ -273,8 +273,9 @@ erDiagram
 | Order | `OrderRequest` | `OrderCommand` | `OrderResponse` |
 
 Request DTO는 Bean Validation을 사용한다. Controller는 단순 값 검증이 끝난 뒤
-UseCase command 또는 VO를 생성하고, 트랜잭션 서비스는 HTTP request DTO가 아니라
-검증 완료 입력을 받는다. Response DTO는 정적 팩터리로 외부 응답 형태를 만든다.
+`dto` 패키지의 UseCase command 또는 VO를 생성하고, 트랜잭션 서비스는 HTTP request
+DTO가 아니라 검증 완료 입력을 받는다. Response DTO는 정적 팩터리로 외부 응답
+형태를 만든다.
 `WishResponse`처럼 다른 Aggregate 정보가 필요한 응답은 UseCase 서비스에서 대상
 Aggregate를 조회한 뒤 응답으로 조립한다. 관리자 Thymeleaf 컨트롤러는 DTO보다 엔티티와
 폼 파라미터를 직접 사용한다.

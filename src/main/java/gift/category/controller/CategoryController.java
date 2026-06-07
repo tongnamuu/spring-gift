@@ -1,6 +1,6 @@
 package gift.category.controller;
 
-import gift.category.usecase.CategoryCommand;
+import gift.category.dto.CategoryCommand;
 import gift.category.usecase.CreateCategoryUseCase;
 import gift.category.usecase.DeleteCategoryUseCase;
 import gift.category.usecase.GetCategoriesUseCase;

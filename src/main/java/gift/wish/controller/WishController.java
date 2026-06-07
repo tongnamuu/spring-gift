@@ -6,7 +6,7 @@ import gift.wish.usecase.AddWishResult;
 import gift.wish.usecase.AddWishUseCase;
 import gift.wish.usecase.GetWishesUseCase;
 import gift.wish.usecase.RemoveWishUseCase;
-import gift.wish.usecase.WishCommand;
+import gift.wish.dto.WishCommand;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

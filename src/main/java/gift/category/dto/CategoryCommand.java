@@ -1,4 +1,4 @@
-package gift.category.usecase;
+package gift.category.dto;
 
 import gift.category.domain.Category;
 

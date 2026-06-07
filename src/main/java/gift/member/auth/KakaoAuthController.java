@@ -1,6 +1,6 @@
 package gift.member.auth;
 
-import gift.member.usecase.auth.KakaoAuthorizationCodeCommand;
+import gift.member.dto.KakaoAuthorizationCodeCommand;
 import gift.member.usecase.auth.LoginWithKakaoUseCase;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;

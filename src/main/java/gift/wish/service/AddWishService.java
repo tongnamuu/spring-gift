@@ -6,7 +6,7 @@ import gift.wish.domain.Wish;
 import gift.wish.domain.WishRepository;
 import gift.wish.usecase.AddWishResult;
 import gift.wish.usecase.AddWishUseCase;
-import gift.wish.usecase.WishCommand;
+import gift.wish.dto.WishCommand;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

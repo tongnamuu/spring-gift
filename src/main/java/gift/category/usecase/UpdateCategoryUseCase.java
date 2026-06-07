@@ -1,6 +1,7 @@
 package gift.category.usecase;
 
 import gift.category.controller.CategoryResponse;
+import gift.category.dto.CategoryCommand;
 
 import java.util.Optional;
 

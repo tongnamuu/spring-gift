@@ -87,6 +87,7 @@ Mockito `verify(times/never)`를 사용한다.
 | `현재 작업` | Member 오류 메시지가 `Member not found. id=...`처럼 DB 식별자를 노출할 수 있었다. | Member 사용자 노출 오류 메시지는 `회원이 존재하지 않습니다.`로 고정했다. 다른 도메인의 `id=` 노출 메시지는 공통 오류 메시지 정책 정리 작업에서 추가 검토한다. |
 | `현재 작업` | 일반 회원가입/로그인과 Kakao 로그인/자동 회원가입 흐름의 입력 경계가 달랐고, `KakaoAuthController`가 외부 client와 repository를 직접 호출했다. | 일반 인증 UseCase는 `MemberCredentialsCommand`, Kakao callback UseCase는 `KakaoAuthorizationCodeCommand`를 받게 했다. `KakaoLoginClient`를 외부 API 포트로 분리하고 실제 REST 구현체와 fake 테스트 구현을 나눴다. |
 | `현재 작업` | `auth`, `member`, `admin`이 최상위/동일 패키지에 섞여 있어 Member 관련 인증과 관리자 흐름의 소유 도메인이 불분명했고, `service`/`usecase`도 클래스가 너무 많아 한 패키지에서 목적을 읽기 어려웠다. | `gift.member` 아래 `auth`, `admin`, `controller`, `domain`을 분리하고, `service`/`usecase`는 `auth`와 `management` workflow 하위 패키지로 정리했다. 테스트 패키지도 같은 구조로 맞췄다. |
+| `현재 작업` | UseCase command record가 `usecase` 패키지에 있어 포트와 입력 DTO의 역할이 섞여 보였다. | `CategoryCommand`, `ProductCommand`, `OptionCommand`, `MemberCredentialsCommand`, `KakaoAuthorizationCodeCommand`, `WishCommand`, `OrderCommand`를 각 도메인의 `dto` 패키지로 이동했다. |
 
 ## 식별된 정책 변경
 

@@ -1,4 +1,4 @@
-package gift.wish.usecase;
+package gift.wish.dto;
 
 public record WishCommand(Long productId) {
 }

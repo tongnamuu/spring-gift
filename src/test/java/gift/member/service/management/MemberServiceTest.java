@@ -10,7 +10,7 @@ import gift.member.usecase.management.DeleteMemberUseCase;
 import gift.member.usecase.management.GetMemberUseCase;
 import gift.member.usecase.management.GetMembersUseCase;
 import gift.member.usecase.auth.LoginMemberUseCase;
-import gift.member.usecase.auth.MemberCredentialsCommand;
+import gift.member.dto.MemberCredentialsCommand;
 import gift.member.usecase.management.UpdateMemberUseCase;
 import gift.support.AbstractMysqlServiceTest;
 import org.junit.jupiter.api.AfterEach;

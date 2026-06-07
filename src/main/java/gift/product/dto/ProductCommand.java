@@ -1,4 +1,4 @@
-package gift.product.usecase;
+package gift.product.dto;
 
 import gift.product.entity.Product;
 import gift.product.vo.ProductName;

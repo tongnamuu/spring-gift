@@ -5,7 +5,7 @@ import gift.category.controller.CategoryResponse;
 import gift.category.domain.Category;
 import gift.category.domain.CategoryRepository;
 import gift.category.query.GetCategoriesService;
-import gift.category.usecase.CategoryCommand;
+import gift.category.dto.CategoryCommand;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
 import gift.support.AbstractMysqlServiceTest;

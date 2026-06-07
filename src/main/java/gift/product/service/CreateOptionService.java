@@ -4,7 +4,7 @@ import gift.product.dto.OptionResponse;
 import gift.product.entity.Option;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
-import gift.product.usecase.OptionCommand;
+import gift.product.dto.OptionCommand;
 import gift.product.usecase.CreateOptionUseCase;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

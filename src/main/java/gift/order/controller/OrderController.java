@@ -3,7 +3,7 @@ package gift.order.controller;
 import gift.member.auth.AuthenticationResolver;
 import gift.order.usecase.CreateOrderUseCase;
 import gift.order.usecase.GetOrdersUseCase;
-import gift.order.usecase.OrderCommand;
+import gift.order.dto.OrderCommand;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;

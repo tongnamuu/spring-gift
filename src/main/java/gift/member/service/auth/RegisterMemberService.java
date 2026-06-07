@@ -4,7 +4,7 @@ import gift.member.auth.JwtProvider;
 import gift.member.auth.TokenResponse;
 import gift.member.domain.Member;
 import gift.member.usecase.management.CreateMemberUseCase;
-import gift.member.usecase.auth.MemberCredentialsCommand;
+import gift.member.dto.MemberCredentialsCommand;
 import gift.member.usecase.auth.RegisterMemberUseCase;
 import org.springframework.stereotype.Service;
 

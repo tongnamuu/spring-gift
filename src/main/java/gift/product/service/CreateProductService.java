@@ -3,7 +3,7 @@ package gift.product.service;
 import gift.category.domain.CategoryRepository;
 import gift.product.dto.ProductResponse;
 import gift.product.repository.ProductRepository;
-import gift.product.usecase.ProductCommand;
+import gift.product.dto.ProductCommand;
 import gift.product.usecase.CreateProductUseCase;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

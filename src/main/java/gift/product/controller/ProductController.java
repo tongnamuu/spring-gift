@@ -6,7 +6,7 @@ import gift.product.usecase.CreateProductUseCase;
 import gift.product.usecase.DeleteProductUseCase;
 import gift.product.usecase.GetProductUseCase;
 import gift.product.usecase.GetProductsUseCase;
-import gift.product.usecase.ProductCommand;
+import gift.product.dto.ProductCommand;
 import gift.product.usecase.UpdateProductUseCase;
 import gift.product.vo.ProductName;
 import jakarta.validation.Valid;

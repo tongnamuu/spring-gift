@@ -1,4 +1,4 @@
-package gift.product.usecase;
+package gift.product.dto;
 
 import gift.product.vo.OptionName;
 

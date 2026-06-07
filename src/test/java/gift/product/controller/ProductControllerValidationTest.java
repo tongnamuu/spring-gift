@@ -3,7 +3,7 @@ package gift.product.controller;
 import gift.product.dto.ProductRequest;
 import gift.product.dto.ProductResponse;
 import gift.product.usecase.CreateProductUseCase;
-import gift.product.usecase.ProductCommand;
+import gift.product.dto.ProductCommand;
 import gift.product.usecase.UpdateProductUseCase;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Page;

@@ -12,7 +12,7 @@ import gift.wish.domain.Wish;
 import gift.wish.domain.WishRepository;
 import gift.wish.query.GetWishesService;
 import gift.wish.usecase.AddWishResult;
-import gift.wish.usecase.WishCommand;
+import gift.wish.dto.WishCommand;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
