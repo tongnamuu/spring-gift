@@ -223,17 +223,17 @@ class WishApiTest extends AbstractMysqlApiTest {
     }
 
     private Member saveMember(String suffix) {
-        return memberRepository.saveAndFlush(new Member(TEST_EMAIL_PREFIX + suffix + "@example.com", "password123"));
+        return memberRepository.save(new Member(TEST_EMAIL_PREFIX + suffix + "@example.com", "password123"));
     }
 
     private Product saveProduct(String suffix) {
-        Category category = categoryRepository.saveAndFlush(new Category(
+        Category category = categoryRepository.save(new Category(
             TEST_CATEGORY_PREFIX + suffix,
             "#ABCDEF",
             "https://example.com/wish-category.png",
             "wish api test category"
         ));
-        return productRepository.saveAndFlush(new Product(
+        return productRepository.save(new Product(
             TEST_PRODUCT_PREFIX + Integer.toUnsignedString(suffix.hashCode(), 36),
             1000,
             "https://example.com/wish-product.png",
@@ -242,7 +242,7 @@ class WishApiTest extends AbstractMysqlApiTest {
     }
 
     private Wish saveWish(Member member, Product product) {
-        return wishRepository.saveAndFlush(new Wish(member.getId(), product.getId()));
+        return wishRepository.save(new Wish(member.getId(), product.getId()));
     }
 
     private long countWishes(Long memberId, Long productId) {

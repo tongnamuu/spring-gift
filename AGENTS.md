@@ -17,7 +17,7 @@ Use the Gradle wrapper.
 
 ## Coding Style & Naming Conventions
 
-Keep code feature-oriented: controllers, repositories, DTOs, entities, and validators should stay in the owning domain package. Use 4-space indentation. Java classes use `PascalCase`; methods, fields, and variables use `camelCase`. Request/response DTOs should follow existing names such as `ProductRequest` and `ProductResponse`. JPA table names must match Flyway schema names, including `options` and `orders`. Add new schema changes as `V{n}__Description.sql`; do not edit existing migrations. Never put `@Transactional` on a class; declare transaction boundaries explicitly on each method that needs them.
+Keep code feature-oriented: controllers, repositories, DTOs, entities, and validators should stay in the owning domain package. Use 4-space indentation. Java classes use `PascalCase`; methods, fields, and variables use `camelCase`. Request/response DTOs should follow existing names such as `ProductRequest` and `ProductResponse`. JPA table names must match Flyway schema names, including `options` and `orders`. Add new schema changes as `V{n}__Description.sql`; do not edit existing migrations. Never put `@Transactional` on a class; declare transaction boundaries explicitly on each method that needs them. Do not use `saveAndFlush`; persist with `save` and let the method-level transaction boundary flush changes.
 
 ## Class & UseCase Design Rules
 

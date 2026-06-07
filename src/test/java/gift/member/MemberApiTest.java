@@ -71,7 +71,7 @@ class MemberApiTest extends AbstractMysqlApiTest {
     @Test
     void registerReturnsBadRequestWhenEmailAlreadyExists() {
         MemberRequest request = new MemberRequest(TEST_EMAIL_PREFIX + "duplicate@example.com", "password123");
-        memberRepository.saveAndFlush(new Member(request.email(), request.password()));
+        memberRepository.save(new Member(request.email(), request.password()));
 
         ResponseEntity<String> response = restTemplate.postForEntity(
             "/api/members/register",
@@ -106,7 +106,7 @@ class MemberApiTest extends AbstractMysqlApiTest {
     @Test
     void loginReturnsOkTokenForRegisteredMember() {
         MemberRequest request = new MemberRequest(TEST_EMAIL_PREFIX + "login@example.com", "password123");
-        memberRepository.saveAndFlush(new Member(request.email(), request.password()));
+        memberRepository.save(new Member(request.email(), request.password()));
 
         ResponseEntity<TokenResponse> response = restTemplate.postForEntity(
             "/api/members/login",
@@ -123,7 +123,7 @@ class MemberApiTest extends AbstractMysqlApiTest {
     @Test
     void loginReturnsBadRequestWhenPasswordDoesNotMatch() {
         String email = TEST_EMAIL_PREFIX + "wrong-password@example.com";
-        memberRepository.saveAndFlush(new Member(email, "password123"));
+        memberRepository.save(new Member(email, "password123"));
 
         ResponseEntity<String> response = restTemplate.postForEntity(
             "/api/members/login",

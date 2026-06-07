@@ -11,8 +11,10 @@ Spring Boot gift service for practicing production-like execution, automated ver
 - Docker Compose MySQL setup uses MySQL 8.4.9 LTS in `compose.yaml`.
 - Baseline `./gradlew test`, `./gradlew serviceTest`, and `./gradlew apiTest` currently succeed.
 - API tests now cover category deletion policy, admin product missing-category display, member registration/login behavior, and wish workflows.
-- Category, Product, Wish, and member registration now have UseCase/service extraction in progress; remaining controller logic still needs the same treatment.
+- Category, Product, Wish, member registration, and order creation now have UseCase/service extraction in progress; remaining controller logic still needs the same treatment.
 - Wish is treated as a separate aggregate root and stores `memberId`/`productId` without direct `Member` or `Product` object references.
+- Product is the aggregate root for option stock changes. Order creation updates option quantity through `Product.subtractOptionQuantity(...)`, and Product/Member optimistic versions guard stock and point concurrency.
+- Order is treated as immutable history. It stores `productId`, `optionId`, and `memberId` values plus the product/option snapshot needed for order lists and Kakao messages.
 
 ## Implementation Strategy
 
@@ -22,6 +24,7 @@ Spring Boot gift service for practicing production-like execution, automated ver
 - Use Angular-style commit messages such as `docs:`, `test:`, `refactor:`, and `fix:`.
 - Do not skip or disable tests to make a change pass.
 - Verify behavior through observable results, not only absence of exceptions.
+- Do not use `saveAndFlush`; use `save` and let method-level transaction boundaries flush changes.
 
 ## Refactoring Change Log
 
@@ -50,13 +53,28 @@ Most remaining Flyway foreign keys are defined without `ON DELETE CASCADE`. In M
 | Target object | Direct FK dependencies | Current risk | Expected policy to define |
 | --- | --- | --- | --- |
 | `Category` | `Product.categoryId` value reference only; no DB FK after `V3__Remove_product_category_foreign_key.sql`. | Products can keep a category id whose category row was deleted. | Allow category deletion and display missing category rows as `미분류 카테고리`. |
-| `Product` | `options.product_id -> product.id`; `wish.product_id` value reference only after `V4__Remove_wish_product_foreign_key.sql`. | Wishes can keep a product id whose product row was deleted. Ordered options can still block product deletion through `orders.option_id`. | Delete products without changing wishes; wish lists hide wishes whose product row is missing. Reject product deletion when orders still reference its options. |
-| `Option` | `orders.option_id -> options.id` | Deleting an option that was ordered will fail at the database level. | Reject option deletion while orders reference it; also keep the existing rule that a product needs at least one option. |
+| `Product` | `options.product_id -> product.id`; `wish.product_id`, `orders.product_id`, and `orders.option_id` are value references only. | Wishes and orders can keep product or option ids whose rows were deleted. | Delete products without changing wishes or orders; wish lists hide missing products, and orders keep immutable ids plus creation-time snapshots. |
+| `Option` | Owned by `Product`; no order FK after `V8__Store_order_product_and_option_ids.sql`. | Orders can keep an option id whose option row was deleted or later changed. | Manage options through the Product aggregate rules; order history keeps the original option id and option-name snapshot. |
 | `Member` | `wish.member_id -> member.id`, `orders.member_id -> member.id` | Deleting a member with wishes or orders will fail at the database level. | Define whether wishes are cleaned up, but reject deletion when order history exists. |
 | `Wish` | None currently identified. | Wish deletion is the lowest FK risk, but ownership validation must remain explicit. | Allow deletion only by the owning member. |
 | `Order` | No current delete API. | No delete behavior has been defined. | Decide whether orders are immutable history. |
 
 Related behavior gap: order creation currently has a documented intent to remove the ordered product from the buyer's wishes, but this still needs runtime verification and may leave wish rows that later block product or member deletion.
+
+### Order Stock And Point Concurrency
+
+Order creation now runs through `CreateOrderService` with method-level `@Transactional`. The service loads the `Product` aggregate root by option id, updates option stock through the Product root, deducts member points, and saves an immutable order record containing `productId`, `optionId`, `memberId`, product name, option name, unit price, and product image URL as a creation-time snapshot.
+
+Current policy:
+
+- `Product.version` protects option stock changes at the Product aggregate boundary.
+- `Product.update_dt` is refreshed when Product fields change or options are added, removed, or decremented.
+- `Member.version` protects point deduction.
+- Order lists use the stored order snapshot, not the current Product/Option state.
+- The service does not force `saveAndFlush`; Product and Member changes are flushed at the transaction boundary.
+- Transaction-boundary concurrency failures are handled by the common API exception handler as `409 Conflict`.
+- Kakao message sending is registered as an after-commit side effect and runs only after the order transaction succeeds.
+- The remaining order behavior gap is ordered-product Wish cleanup.
 
 ## Member Registration And Login
 
@@ -87,7 +105,7 @@ Earlier runtime verification on the local application confirmed that FK failures
 | --- | --- | --- | --- |
 | `DELETE /api/categories/1` | `500 Internal Server Error` | `DataIntegrityViolationException` from `SQLIntegrityConstraintViolationException` | `product.category_id -> category.id` (`product_ibfk_1`) |
 | `DELETE /api/products/1` | `500 Internal Server Error` | `DataIntegrityViolationException` from `SQLIntegrityConstraintViolationException` | `wish.product_id -> product.id` (`wish_ibfk_2`), later removed by `V4__Remove_wish_product_foreign_key.sql` |
-| `DELETE /api/products/2/options/3` | `500 Internal Server Error` | `DataIntegrityViolationException` from `SQLIntegrityConstraintViolationException` | `orders.option_id -> options.id` (`orders_ibfk_1`) |
+| `DELETE /api/products/2/options/3` | `500 Internal Server Error` | `DataIntegrityViolationException` from `SQLIntegrityConstraintViolationException` | Historical: `orders.option_id -> options.id` (`orders_ibfk_1`), removed by `V8__Store_order_product_and_option_ids.sql` |
 | `POST /admin/members/2/delete` | `500 Internal Server Error` | `DataIntegrityViolationException` from `SQLIntegrityConstraintViolationException` | `orders.member_id -> member.id` (`orders_ibfk_2`) |
 
 Application startup itself succeeds against local MySQL. The remaining startup warnings are Flyway's MySQL 8.4 support warning and Spring's default `open-in-view` warning.
@@ -158,6 +176,8 @@ Object-specific implementation checklist is tracked in `docs/refactoring-change-
 - `./gradlew test --tests "gift.wish.domain.WishContractTest" --rerun-tasks` - passed.
 - `./gradlew serviceTest --tests "gift.wish.service.WishServiceTest" --rerun-tasks` - passed against Docker Compose MySQL test database.
 - `./gradlew apiTest --tests "gift.wish.controller.WishApiTest" --rerun-tasks` - passed against Docker Compose MySQL test database.
+- `./gradlew serviceTest --tests "gift.order.OrderServiceTest" --rerun-tasks` - passed against Docker Compose MySQL test database for order snapshot persistence.
+- `./gradlew serviceTest --tests "gift.order.OrderConcurrencyServiceTest" --rerun-tasks` - passed against Docker Compose MySQL test database after Product/Member transaction-boundary concurrency handling.
 - Cucumber feature files added under `src/test/resources/features`; step definitions and runner are not configured yet.
 - `./gradlew build --rerun-tasks` - passed.
 
@@ -168,3 +188,4 @@ Object-specific implementation checklist is tracked in `docs/refactoring-change-
 - Black-box test design: organized current API behavior into Cucumber feature files for member, category, product, option, wish, and order workflows.
 - Runtime environment setup: added `.env.example`, documented local `.env` usage, MySQL startup, and Kakao Login consent items.
 - Member API behavior analysis: added tests for registration/login success and failure cases, then changed concurrent duplicate registration to return `400 Bad Request` with the duplicate-email message.
+- Order modeling and concurrency analysis: added service-level stock/snapshot/point concurrency tests, introduced Product/Member optimistic versions, routed option stock changes through the Product aggregate root, removed forced flushes, and moved Kakao messages to after-commit.

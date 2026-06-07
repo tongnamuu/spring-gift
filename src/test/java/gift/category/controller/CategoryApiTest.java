@@ -79,7 +79,7 @@ class CategoryApiTest extends AbstractMysqlApiTest {
     }
 
     private Category saveCategory(String name) {
-        return categoryRepository.saveAndFlush(new Category(
+        return categoryRepository.save(new Category(
             name,
             "#ABCDEF",
             "https://example.com/category-api-test.png",
@@ -88,7 +88,7 @@ class CategoryApiTest extends AbstractMysqlApiTest {
     }
 
     private Product saveProduct(String name, Long categoryId) {
-        return productRepository.saveAndFlush(new Product(
+        return productRepository.save(new Product(
             name,
             1_000,
             "https://example.com/category-api-product.png",

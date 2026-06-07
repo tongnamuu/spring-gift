@@ -13,6 +13,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.ArrayList;
@@ -72,7 +73,7 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
         assertThat(successCount(results)).isEqualTo(1L);
         assertThat(failures).hasSize(REQUEST_COUNT - 1);
         assertThat(failures)
-            .allSatisfy(failure -> assertThat(failure).isInstanceOf(IllegalArgumentException.class));
+            .allSatisfy(this::assertOrderFailure);
         assertThat(countOrdersByOption(option.getId())).isEqualTo(1L);
         assertThat(findOptionQuantity(option.getId())).isZero();
         assertThat(sumMemberPoint(TEST_EMAIL_PREFIX + "stock-%")).isEqualTo((REQUEST_COUNT * 100000) - 1000);
@@ -82,18 +83,25 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
     void concurrentOrdersDoNotOverspendMemberPoint() throws Exception {
         assertOrderServiceExists();
         Member member = saveMember("point", 1000);
-        Option option = saveOption("point", 1000, REQUEST_COUNT);
+        List<Option> options = saveOptions("point", 1000, 1, REQUEST_COUNT);
 
-        List<CreateOrderResult> results = createOrdersConcurrently(member, option, REQUEST_COUNT);
+        List<CreateOrderResult> results = createOrdersConcurrently(member, options);
         List<Throwable> failures = failures(results);
 
         assertThat(successCount(results)).isEqualTo(1L);
         assertThat(failures).hasSize(REQUEST_COUNT - 1);
         assertThat(failures)
-            .allSatisfy(failure -> assertThat(failure).isInstanceOf(IllegalArgumentException.class));
-        assertThat(countOrders(member.getId(), option.getId())).isEqualTo(1L);
-        assertThat(findOptionQuantity(option.getId())).isEqualTo(REQUEST_COUNT - 1);
+            .allSatisfy(this::assertOrderFailure);
+        assertThat(countOrdersByMember(member.getId())).isEqualTo(1L);
+        assertThat(sumOptionQuantity(TEST_PRODUCT_PREFIX + "point-%")).isEqualTo(REQUEST_COUNT - 1);
         assertThat(findMemberPoint(member.getId())).isZero();
+    }
+
+    private void assertOrderFailure(Throwable failure) {
+        assertThat(failure).isInstanceOfAny(
+            IllegalArgumentException.class,
+            ConcurrencyFailureException.class
+        );
     }
 
     private void assertOrderServiceExists() {
@@ -108,25 +116,50 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
             IntStream.range(0, requestCount)
                 .mapToObj(ignored -> member)
                 .toList(),
-            option
+            IntStream.range(0, requestCount)
+                .mapToObj(ignored -> option)
+                .toList()
         );
     }
 
     private List<CreateOrderResult> createOrdersConcurrently(List<Member> members, Option option)
         throws Exception {
+        return createOrdersConcurrently(
+            members,
+            IntStream.range(0, members.size())
+                .mapToObj(ignored -> option)
+                .toList()
+        );
+    }
+
+    private List<CreateOrderResult> createOrdersConcurrently(Member member, List<Option> options)
+        throws Exception {
+        return createOrdersConcurrently(
+            IntStream.range(0, options.size())
+                .mapToObj(ignored -> member)
+                .toList(),
+            options
+        );
+    }
+
+    private List<CreateOrderResult> createOrdersConcurrently(List<Member> members, List<Option> options)
+        throws Exception {
+        assertThat(options).hasSameSizeAs(members);
         ExecutorService executorService = Executors.newFixedThreadPool(members.size());
         CountDownLatch ready = new CountDownLatch(members.size());
         CountDownLatch start = new CountDownLatch(1);
-        OrderRequest request = new OrderRequest(option.getId(), 1, "동시 주문");
 
         try {
-            List<Future<CreateOrderResult>> futures = members.stream()
-                .map(member -> executorService.submit(() -> {
+            List<Future<CreateOrderResult>> futures = IntStream.range(0, members.size())
+                .mapToObj(index -> executorService.submit(() -> {
                     ready.countDown();
                     if (!start.await(5, TimeUnit.SECONDS)) {
                         throw new IllegalStateException("Timed out while waiting to start concurrent order requests.");
                     }
                     try {
+                        Member member = members.get(index);
+                        Option option = options.get(index);
+                        OrderRequest request = new OrderRequest(option.getId(), 1, "동시 주문");
                         OrderResponse response = createOrderUseCase.execute(member.getId(), request);
                         return CreateOrderResult.ok(response);
                     } catch (RuntimeException e) {
@@ -154,26 +187,32 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
             .toList();
     }
 
+    private List<Option> saveOptions(String suffix, int productPrice, int quantity, int count) {
+        return IntStream.range(0, count)
+            .mapToObj(index -> saveOption(suffix + "-" + index, productPrice, quantity))
+            .toList();
+    }
+
     private Member saveMember(String suffix, int point) {
         Member member = new Member(TEST_EMAIL_PREFIX + suffix + "@example.com", "password123");
         member.chargePoint(point);
-        return memberRepository.saveAndFlush(member);
+        return memberRepository.save(member);
     }
 
     private Option saveOption(String suffix, int productPrice, int quantity) {
-        Category category = categoryRepository.saveAndFlush(new Category(
+        Category category = categoryRepository.save(new Category(
             TEST_CATEGORY_PREFIX + suffix,
             "#123456",
             "https://example.com/order-category.png",
             "order concurrency test category"
         ));
-        Product product = productRepository.saveAndFlush(new Product(
+        Product product = productRepository.save(new Product(
             TEST_PRODUCT_PREFIX + suffix,
             productPrice,
             "https://example.com/order-product.png",
             category.getId()
         ));
-        return optionRepository.saveAndFlush(new Option(product, "기본 옵션 " + suffix, quantity));
+        return optionRepository.save(new Option(product, "기본 옵션 " + suffix, quantity));
     }
 
     private long successCount(List<CreateOrderResult> results) {
@@ -195,6 +234,14 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
             Long.class,
             memberId,
             optionId
+        );
+    }
+
+    private long countOrdersByMember(Long memberId) {
+        return jdbcTemplate.queryForObject(
+            "select count(*) from orders where member_id = ?",
+            Long.class,
+            memberId
         );
     }
 
@@ -220,6 +267,20 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
             Integer.class,
             memberId
         );
+    }
+
+    private int sumOptionQuantity(String productNamePattern) {
+        Integer sum = jdbcTemplate.queryForObject(
+            """
+                select coalesce(sum(o.quantity), 0)
+                from options o
+                inner join product p on p.id = o.product_id
+                where p.name like ?
+                """,
+            Integer.class,
+            productNamePattern
+        );
+        return sum == null ? 0 : sum;
     }
 
     private int sumMemberPoint(String emailPattern) {

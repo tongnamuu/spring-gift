@@ -7,7 +7,10 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Version;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,6 +29,12 @@ public class Product {
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Option> options = new ArrayList<>();
 
+    @Column(name = "update_dt", nullable = false)
+    private LocalDateTime updateDt;
+
+    @Version
+    private Long version;
+
     protected Product() {
     }
 
@@ -34,6 +43,14 @@ public class Product {
         this.price = price;
         this.imageUrl = imageUrl;
         this.categoryId = categoryId;
+        this.updateDt = LocalDateTime.now();
+    }
+
+    @PrePersist
+    void prePersist() {
+        if (updateDt == null) {
+            updateDt = LocalDateTime.now();
+        }
     }
 
     public void update(String name, int price, String imageUrl, Long categoryId) {
@@ -41,6 +58,7 @@ public class Product {
         this.price = price;
         this.imageUrl = imageUrl;
         this.categoryId = categoryId;
+        recordUpdated();
     }
 
     public Option addOption(String name, int quantity) {
@@ -50,6 +68,7 @@ public class Product {
 
         Option option = new Option(this, name, quantity);
         options.add(option);
+        recordUpdated();
         return option;
     }
 
@@ -62,6 +81,14 @@ public class Product {
         }
 
         options.removeIf(existing -> isSameOption(existing, option));
+        recordUpdated();
+    }
+
+    public Option subtractOptionQuantity(Long optionId, int amount) {
+        Option option = findOption(optionId);
+        option.subtractQuantity(amount);
+        recordUpdated();
+        return option;
     }
 
     public Long getId() {
@@ -86,6 +113,25 @@ public class Product {
 
     public List<Option> getOptions() {
         return options;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public LocalDateTime getUpdateDt() {
+        return updateDt;
+    }
+
+    private Option findOption(Long optionId) {
+        return options.stream()
+            .filter(option -> option.getId() != null && option.getId().equals(optionId))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("상품에 속하지 않은 옵션입니다."));
+    }
+
+    private void recordUpdated() {
+        updateDt = LocalDateTime.now();
     }
 
     private boolean hasOptionName(String name) {

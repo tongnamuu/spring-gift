@@ -22,7 +22,7 @@ public class CreateMemberService implements CreateMemberUseCase {
         }
 
         try {
-            return memberRepository.saveAndFlush(new Member(email, password));
+            return memberRepository.save(new Member(email, password));
         } catch (DataIntegrityViolationException e) {
             if (isDuplicateEmailViolation(e)) {
                 throw new IllegalArgumentException(DUPLICATE_EMAIL_MESSAGE, e);

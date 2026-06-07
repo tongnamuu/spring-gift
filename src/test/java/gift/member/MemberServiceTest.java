@@ -67,7 +67,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
     @Test
     void createMemberRejectsDuplicateEmail() {
         String email = TEST_EMAIL_PREFIX + "duplicate@example.com";
-        memberRepository.saveAndFlush(new Member(email, "password123"));
+        memberRepository.save(new Member(email, "password123"));
 
         assertThatThrownBy(() -> createMemberUseCase.execute(email, "another-password"))
             .isInstanceOf(IllegalArgumentException.class)

@@ -44,13 +44,13 @@ class AdminProductApiTest extends AbstractMysqlApiTest {
 
     @Test
     void productListDisplaysUncategorizedWhenCategoryIsMissing() {
-        Category category = categoryRepository.saveAndFlush(new Category(
+        Category category = categoryRepository.save(new Category(
             TEST_CATEGORY_PREFIX + "missing",
             "#123456",
             "https://example.com/admin-category.png",
             "admin product list category"
         ));
-        Product product = productRepository.saveAndFlush(new Product(
+        Product product = productRepository.save(new Product(
             TEST_PRODUCT_PREFIX + "x",
             1_000,
             "https://example.com/admin-product.png",
