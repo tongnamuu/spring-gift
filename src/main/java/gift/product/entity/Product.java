@@ -46,6 +46,10 @@ public class Product {
         this.updateDt = LocalDateTime.now();
     }
 
+    public Product(ProductName name, int price, String imageUrl, Long categoryId) {
+        this(name.value(), price, imageUrl, categoryId);
+    }
+
     @PrePersist
     void prePersist() {
         if (updateDt == null) {
@@ -61,6 +65,10 @@ public class Product {
         recordUpdated();
     }
 
+    public void update(ProductName name, int price, String imageUrl, Long categoryId) {
+        update(name.value(), price, imageUrl, categoryId);
+    }
+
     public Option addOption(String name, int quantity) {
         if (hasOptionName(name)) {
             throw new IllegalArgumentException("이미 존재하는 옵션명입니다.");
@@ -70,6 +78,10 @@ public class Product {
         options.add(option);
         recordUpdated();
         return option;
+    }
+
+    public Option addOption(OptionName name, int quantity) {
+        return addOption(name.value(), quantity);
     }
 
     public void removeOption(Option option) {

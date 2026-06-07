@@ -8,10 +8,11 @@ import gift.order.controller.OrderRequest;
 import gift.order.controller.OrderResponse;
 import gift.order.usecase.CreateOrderUseCase;
 import gift.order.usecase.GetOrdersUseCase;
-import gift.product.dto.OptionRequest;
 import gift.product.dto.OptionResponse;
+import gift.product.entity.OptionName;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
+import gift.product.usecase.OptionCommand;
 import gift.product.usecase.CreateOptionUseCase;
 import gift.product.usecase.DeleteOptionUseCase;
 import gift.support.AbstractMysqlServiceTest;
@@ -259,7 +260,7 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
     }
 
     private OptionResponse saveOption(Product product, String name, int quantity) {
-        return createOptionUseCase.execute(product.getId(), new OptionRequest(name, quantity));
+        return createOptionUseCase.execute(product.getId(), new OptionCommand(new OptionName(name), quantity));
     }
 
     private void updateProductAfterOrder(Long productId, Long categoryId) {

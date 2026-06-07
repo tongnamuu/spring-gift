@@ -9,11 +9,12 @@ import gift.order.controller.OrderResponse;
 import gift.order.domain.Order;
 import gift.order.domain.OrderRepository;
 import gift.order.usecase.CreateOrderUseCase;
-import gift.product.dto.OptionRequest;
 import gift.product.dto.OptionResponse;
+import gift.product.entity.OptionName;
 import gift.product.entity.Option;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
+import gift.product.usecase.OptionCommand;
 import gift.product.usecase.CreateOptionUseCase;
 import gift.support.AbstractMysqlServiceTest;
 import jakarta.persistence.OptimisticLockException;
@@ -260,7 +261,7 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
     private OptionResponse saveOption(Product product, String name, int quantity) {
         return createOptionUseCase.execute(
             product.getId(),
-            new OptionRequest(name, quantity)
+            new OptionCommand(new OptionName(name), quantity)
         );
     }
 

@@ -3,8 +3,8 @@ package gift.product.controller;
 import gift.category.domain.Category;
 import gift.category.domain.CategoryRepository;
 import gift.product.entity.Product;
+import gift.product.entity.ProductName;
 import gift.product.repository.ProductRepository;
-import gift.product.validator.ProductNameValidator;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -50,16 +50,16 @@ public class AdminProductController {
         @RequestParam Long categoryId,
         Model model
     ) {
-        List<String> errors = ProductNameValidator.validate(name, true);
-        if (!errors.isEmpty()) {
-            populateNewForm(model, errors, name, price, imageUrl, categoryId);
+        ProductNameResult productNameResult = productNameAllowingKakao(name);
+        if (productNameResult.hasError()) {
+            populateNewForm(model, List.of(productNameResult.error()), name, price, imageUrl, categoryId);
             return "product/new";
         }
 
         if (!categoryRepository.existsById(categoryId)) {
             throw new NoSuchElementException("카테고리가 존재하지 않습니다. id=" + categoryId);
         }
-        productRepository.save(new Product(name, price, imageUrl, categoryId));
+        productRepository.save(new Product(productNameResult.name(), price, imageUrl, categoryId));
         return "redirect:/admin/products";
     }
 
@@ -84,9 +84,9 @@ public class AdminProductController {
         Product product = productRepository.findById(id)
             .orElseThrow(() -> new NoSuchElementException("상품이 존재하지 않습니다. id=" + id));
 
-        List<String> errors = ProductNameValidator.validate(name, true);
-        if (!errors.isEmpty()) {
-            populateEditForm(model, product, errors, name, price, imageUrl, categoryId);
+        ProductNameResult productNameResult = productNameAllowingKakao(name);
+        if (productNameResult.hasError()) {
+            populateEditForm(model, product, List.of(productNameResult.error()), name, price, imageUrl, categoryId);
             return "product/edit";
         }
 
@@ -94,7 +94,7 @@ public class AdminProductController {
             throw new NoSuchElementException("카테고리가 존재하지 않습니다. id=" + categoryId);
         }
 
-        product.update(name, price, imageUrl, categoryId);
+        product.update(productNameResult.name(), price, imageUrl, categoryId);
         productRepository.save(product);
         return "redirect:/admin/products";
     }
@@ -142,5 +142,27 @@ public class AdminProductController {
     private Map<Long, String> categoryNames() {
         return categoryRepository.findAll().stream()
             .collect(Collectors.toMap(Category::getId, Category::getName));
+    }
+
+    private ProductNameResult productNameAllowingKakao(String name) {
+        try {
+            return ProductNameResult.valid(ProductName.allowingKakao(name));
+        } catch (IllegalArgumentException e) {
+            return ProductNameResult.invalid(e.getMessage());
+        }
+    }
+
+    private record ProductNameResult(ProductName name, String error) {
+        private static ProductNameResult valid(ProductName name) {
+            return new ProductNameResult(name, null);
+        }
+
+        private static ProductNameResult invalid(String error) {
+            return new ProductNameResult(null, error);
+        }
+
+        private boolean hasError() {
+            return error != null;
+        }
     }
 }

@@ -7,7 +7,9 @@ import gift.member.MemberRepository;
 import gift.product.dto.OptionRequest;
 import gift.product.dto.ProductRequest;
 import gift.product.dto.ProductResponse;
+import gift.product.entity.OptionName;
 import gift.product.entity.Product;
+import gift.product.entity.ProductName;
 import gift.product.repository.ProductRepository;
 import gift.support.AbstractMysqlServiceTest;
 import gift.wish.domain.Wish;
@@ -24,6 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
     private static final String TEST_CATEGORY_PREFIX = "pc-";
@@ -83,7 +86,7 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
             category.getId()
         );
 
-        ProductResponse response = createProductUseCase.execute(request);
+        ProductResponse response = createProductUseCase.execute(productCommand(request));
 
         assertThat(response.id()).isNotNull();
         assertThat(response.name()).isEqualTo(request.name());
@@ -109,7 +112,7 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
     void getProductReturnsPersistedProduct() {
         Category category = saveCategory(TEST_CATEGORY_PREFIX + "get");
         Product product = saveProduct(TEST_PRODUCT_PREFIX + "get", category.getId());
-        createOptionUseCase.execute(product.getId(), new OptionRequest("단건 옵션", 10));
+        createOptionUseCase.execute(product.getId(), optionCommand("단건 옵션", 10));
 
         Optional<ProductResponse> response = getProductUseCase.execute(product.getId());
 
@@ -130,8 +133,8 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
         Category category = saveCategory(TEST_CATEGORY_PREFIX + "list");
         Product first = saveProduct(TEST_PRODUCT_PREFIX + "list-first", category.getId());
         Product second = saveProduct(TEST_PRODUCT_PREFIX + "list-second", category.getId());
-        createOptionUseCase.execute(first.getId(), new OptionRequest("목록 첫 옵션", 10));
-        createOptionUseCase.execute(second.getId(), new OptionRequest("목록 둘 옵션", 20));
+        createOptionUseCase.execute(first.getId(), optionCommand("목록 첫 옵션", 10));
+        createOptionUseCase.execute(second.getId(), optionCommand("목록 둘 옵션", 20));
 
         Page<ProductResponse> response = getProductsUseCase.execute(PageRequest.of(0, 20));
 
@@ -163,7 +166,7 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
             newCategory.getId()
         );
 
-        Optional<ProductResponse> response = updateProductUseCase.execute(product.getId(), request);
+        Optional<ProductResponse> response = updateProductUseCase.execute(product.getId(), productCommand(request));
 
         assertThat(response).isPresent();
         assertThat(response.orElseThrow().id()).isEqualTo(product.getId());
@@ -176,6 +179,27 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
         assertThat(persisted.getPrice()).isEqualTo(request.price());
         assertThat(persisted.getImageUrl()).isEqualTo(request.imageUrl());
         assertThat(persisted.getCategoryId()).isEqualTo(newCategory.getId());
+    }
+
+    @Test
+    void updateProductRejectsMissingCategoryWhenProductExists() {
+        Category category = saveCategory(TEST_CATEGORY_PREFIX + "missing-before");
+        Product product = saveProduct(TEST_PRODUCT_PREFIX + "up-cat", category.getId());
+        Long missingCategoryId = Long.MAX_VALUE;
+        ProductRequest request = new ProductRequest(
+            TEST_PRODUCT_PREFIX + "up-cat-new",
+            20000,
+            "https://example.com/product-update.png",
+            missingCategoryId
+        );
+
+        assertThatThrownBy(() -> updateProductUseCase.execute(product.getId(), productCommand(request)))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("카테고리가 존재하지 않습니다. id=" + missingCategoryId);
+
+        Product persisted = productRepository.findById(product.getId()).orElseThrow();
+        assertThat(persisted.getName()).isEqualTo(product.getName());
+        assertThat(persisted.getCategoryId()).isEqualTo(category.getId());
     }
 
     @Test
@@ -223,6 +247,19 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
             "https://example.com/product.png",
             categoryId
         ));
+    }
+
+    private ProductCommand productCommand(ProductRequest request) {
+        return new ProductCommand(
+            new ProductName(request.name()),
+            request.price(),
+            request.imageUrl(),
+            request.categoryId()
+        );
+    }
+
+    private OptionCommand optionCommand(String name, int quantity) {
+        return new OptionCommand(new OptionName(name), quantity);
     }
 
     private Member saveMember(String suffix) {

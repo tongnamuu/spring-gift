@@ -4,8 +4,10 @@ import gift.category.domain.Category;
 import gift.category.domain.CategoryRepository;
 import gift.product.dto.OptionRequest;
 import gift.product.dto.OptionResponse;
+import gift.product.entity.OptionName;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
+import gift.product.usecase.OptionCommand;
 import gift.product.usecase.CreateOptionUseCase;
 import gift.support.AbstractMysqlApiTest;
 import org.junit.jupiter.api.AfterEach;
@@ -55,7 +57,7 @@ class OptionApiTest extends AbstractMysqlApiTest {
         Product product = saveProduct();
         OptionResponse option = createOptionUseCase.execute(
             product.getId(),
-            new OptionRequest(TEST_OPTION_PREFIX + "last", 10)
+            new OptionCommand(new OptionName(TEST_OPTION_PREFIX + "last"), 10)
         );
 
         ResponseEntity<String> response = restTemplate.exchange(

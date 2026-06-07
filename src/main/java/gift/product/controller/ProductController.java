@@ -2,10 +2,12 @@ package gift.product.controller;
 
 import gift.product.dto.ProductRequest;
 import gift.product.dto.ProductResponse;
+import gift.product.entity.ProductName;
 import gift.product.usecase.CreateProductUseCase;
 import gift.product.usecase.DeleteProductUseCase;
 import gift.product.usecase.GetProductUseCase;
 import gift.product.usecase.GetProductsUseCase;
+import gift.product.usecase.ProductCommand;
 import gift.product.usecase.UpdateProductUseCase;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -61,7 +63,7 @@ public class ProductController {
 
     @PostMapping
     public ResponseEntity<ProductResponse> createProduct(@Valid @RequestBody ProductRequest request) {
-        ProductResponse response = createProductUseCase.execute(request);
+        ProductResponse response = createProductUseCase.execute(toCommand(request));
         return ResponseEntity.created(URI.create("/api/products/" + response.id()))
             .body(response);
     }
@@ -71,7 +73,7 @@ public class ProductController {
         @PathVariable Long id,
         @Valid @RequestBody ProductRequest request
     ) {
-        return updateProductUseCase.execute(id, request)
+        return updateProductUseCase.execute(id, toCommand(request))
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -90,5 +92,14 @@ public class ProductController {
     @ExceptionHandler(NoSuchElementException.class)
     public ResponseEntity<Void> handleNoSuchElement() {
         return ResponseEntity.notFound().build();
+    }
+
+    private ProductCommand toCommand(ProductRequest request) {
+        return new ProductCommand(
+            new ProductName(request.name()),
+            request.price(),
+            request.imageUrl(),
+            request.categoryId()
+        );
     }
 }

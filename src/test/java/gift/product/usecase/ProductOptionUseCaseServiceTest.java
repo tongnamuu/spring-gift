@@ -4,6 +4,7 @@ import gift.category.domain.Category;
 import gift.category.domain.CategoryRepository;
 import gift.product.dto.OptionRequest;
 import gift.product.dto.OptionResponse;
+import gift.product.entity.OptionName;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
 import gift.support.AbstractMysqlServiceTest;
@@ -67,7 +68,7 @@ class ProductOptionUseCaseServiceTest extends AbstractMysqlServiceTest {
         Product product = saveProduct(TEST_PRODUCT_PREFIX + "create");
         OptionRequest request = new OptionRequest(TEST_OPTION_PREFIX + "create", 10);
 
-        OptionResponse response = createOptionUseCase.execute(product.getId(), request);
+        OptionResponse response = createOptionUseCase.execute(product.getId(), optionCommand(request));
 
         assertThat(response.id()).isNotNull();
         assertThat(response.name()).isEqualTo(request.name());
@@ -106,7 +107,7 @@ class ProductOptionUseCaseServiceTest extends AbstractMysqlServiceTest {
         saveOption(product, TEST_OPTION_PREFIX + "duplicate", 10);
         OptionRequest request = new OptionRequest(TEST_OPTION_PREFIX + "duplicate", 20);
 
-        assertThatThrownBy(() -> createOptionUseCase.execute(product.getId(), request))
+        assertThatThrownBy(() -> createOptionUseCase.execute(product.getId(), optionCommand(request)))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("이미 존재하는 옵션명입니다.");
     }
@@ -182,7 +183,7 @@ class ProductOptionUseCaseServiceTest extends AbstractMysqlServiceTest {
     }
 
     private OptionResponse saveOption(Product product, String name, int quantity) {
-        return createOptionUseCase.execute(product.getId(), new OptionRequest(name, quantity));
+        return createOptionUseCase.execute(product.getId(), optionCommand(name, quantity));
     }
 
     private List<CreateOptionResult> createOptionsConcurrently(
@@ -218,11 +219,19 @@ class ProductOptionUseCaseServiceTest extends AbstractMysqlServiceTest {
         ready.countDown();
         await(start);
         try {
-            OptionResponse response = createOptionUseCase.execute(productId, request);
+            OptionResponse response = createOptionUseCase.execute(productId, optionCommand(request));
             return CreateOptionResult.success(response);
         } catch (Throwable failure) {
             return CreateOptionResult.failure(failure);
         }
+    }
+
+    private OptionCommand optionCommand(OptionRequest request) {
+        return optionCommand(request.name(), request.quantity());
+    }
+
+    private OptionCommand optionCommand(String name, int quantity) {
+        return new OptionCommand(new OptionName(name), quantity);
     }
 
     private List<DeleteOptionResult> deleteOptionsConcurrently(Long productId, List<Long> optionIds) throws Exception {

@@ -2,6 +2,8 @@ package gift.product.controller;
 
 import gift.product.dto.OptionRequest;
 import gift.product.dto.OptionResponse;
+import gift.product.entity.OptionName;
+import gift.product.usecase.OptionCommand;
 import gift.product.usecase.CreateOptionUseCase;
 import gift.product.usecase.DeleteOptionUseCase;
 import gift.product.usecase.GetOptionsUseCase;
@@ -21,7 +23,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 
 /*
- * Each product must have at least one option at all times.
+ * A product can be created without options, but the last registered option cannot be removed.
  * Option names are validated against allowed characters and length constraints.
  */
 @RestController
@@ -53,7 +55,7 @@ public class OptionController {
         @PathVariable Long productId,
         @Valid @RequestBody OptionRequest request
     ) {
-        OptionResponse response = createOptionUseCase.execute(productId, request);
+        OptionResponse response = createOptionUseCase.execute(productId, toCommand(request));
         URI location = URI.create("/api/products/" + productId + "/options/" + response.id());
         return ResponseEntity.created(location)
             .body(response);
@@ -76,5 +78,9 @@ public class OptionController {
     @ExceptionHandler(NoSuchElementException.class)
     public ResponseEntity<Void> handleNoSuchElement() {
         return ResponseEntity.notFound().build();
+    }
+
+    private OptionCommand toCommand(OptionRequest request) {
+        return new OptionCommand(new OptionName(request.name()), request.quantity());
     }
 }
