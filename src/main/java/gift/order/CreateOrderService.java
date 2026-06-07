@@ -5,10 +5,9 @@ import gift.member.MemberRepository;
 import gift.product.entity.Option;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.NoSuchElementException;
 
@@ -17,18 +16,18 @@ public class CreateOrderService implements CreateOrderUseCase {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final MemberRepository memberRepository;
-    private final KakaoMessageClient kakaoMessageClient;
+    private final ApplicationEventPublisher eventPublisher;
 
     public CreateOrderService(
         OrderRepository orderRepository,
         ProductRepository productRepository,
         MemberRepository memberRepository,
-        KakaoMessageClient kakaoMessageClient
+        ApplicationEventPublisher eventPublisher
     ) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.memberRepository = memberRepository;
-        this.kakaoMessageClient = kakaoMessageClient;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -55,31 +54,14 @@ public class CreateOrderService implements CreateOrderUseCase {
             request.quantity(),
             request.message()
         ));
-        sendKakaoMessageAfterCommit(member.getKakaoAccessToken(), saved);
+        publishKakaoMessageEvent(member.getKakaoAccessToken(), saved);
         return OrderResponse.from(saved);
     }
 
-    private void sendKakaoMessageAfterCommit(String accessToken, Order order) {
+    private void publishKakaoMessageEvent(String accessToken, Order order) {
         if (accessToken == null) {
             return;
         }
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            sendKakaoMessageIfPossible(accessToken, order);
-            return;
-        }
-
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                sendKakaoMessageIfPossible(accessToken, order);
-            }
-        });
-    }
-
-    private void sendKakaoMessageIfPossible(String accessToken, Order order) {
-        try {
-            kakaoMessageClient.sendToMe(accessToken, order);
-        } catch (Exception ignored) {
-        }
+        eventPublisher.publishEvent(new OrderCreatedEvent(accessToken, KakaoOrderMessage.from(order)));
     }
 }

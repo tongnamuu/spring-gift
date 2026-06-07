@@ -54,7 +54,7 @@ Most remaining Flyway foreign keys are defined without `ON DELETE CASCADE`. In M
 | --- | --- | --- | --- |
 | `Category` | `Product.categoryId` value reference only; no DB FK after `V3__Remove_product_category_foreign_key.sql`. | Products can keep a category id whose category row was deleted. | Allow category deletion and display missing category rows as `미분류 카테고리`. |
 | `Product` | `options.product_id -> product.id`; `wish.product_id`, `orders.product_id`, and `orders.option_id` are value references only. | Wishes and orders can keep product or option ids whose rows were deleted. | Delete products without changing wishes or orders; wish lists hide missing products, and orders keep immutable ids plus creation-time snapshots. |
-| `Option` | Owned by `Product`; no order FK after `V8__Store_order_product_and_option_ids.sql`. | Orders can keep an option id whose option row was deleted or later changed. | Manage options through the Product aggregate rules; order history keeps the original option id and option-name snapshot. |
+| `Option` | Owned by `Product`; no order FK after `V8__Store_order_product_and_option_ids.sql`. | Orders can keep an option id whose option row was deleted or later changed. | Ordered options can be deleted when Product aggregate rules allow it; order history keeps the original option id and option-name snapshot. |
 | `Member` | `wish.member_id -> member.id`, `orders.member_id -> member.id` | Deleting a member with wishes or orders will fail at the database level. | Define whether wishes are cleaned up, but reject deletion when order history exists. |
 | `Wish` | None currently identified. | Wish deletion is the lowest FK risk, but ownership validation must remain explicit. | Allow deletion only by the owning member. |
 | `Order` | No current delete API. | No delete behavior has been defined. | Decide whether orders are immutable history. |
@@ -73,7 +73,7 @@ Current policy:
 - Order lists use the stored order snapshot, not the current Product/Option state.
 - The service does not force `saveAndFlush`; Product and Member changes are flushed at the transaction boundary.
 - Transaction-boundary concurrency failures are handled by the common API exception handler as `409 Conflict`.
-- Kakao message sending is registered as an after-commit side effect and runs only after the order transaction succeeds.
+- Kakao message sending is published as an order event and handled by an `AFTER_COMMIT` async listener through the `KakaoMessageSender` port, so it runs only after the order transaction succeeds without blocking the response path.
 - The remaining order behavior gap is ordered-product Wish cleanup.
 
 ## Member Registration And Login
@@ -176,7 +176,7 @@ Object-specific implementation checklist is tracked in `docs/refactoring-change-
 - `./gradlew test --tests "gift.wish.domain.WishContractTest" --rerun-tasks` - passed.
 - `./gradlew serviceTest --tests "gift.wish.service.WishServiceTest" --rerun-tasks` - passed against Docker Compose MySQL test database.
 - `./gradlew apiTest --tests "gift.wish.controller.WishApiTest" --rerun-tasks` - passed against Docker Compose MySQL test database.
-- `./gradlew serviceTest --tests "gift.order.OrderServiceTest" --rerun-tasks` - passed against Docker Compose MySQL test database for order snapshot persistence.
+- `./gradlew serviceTest --tests "gift.order.OrderServiceTest" --rerun-tasks` - passed against Docker Compose MySQL test database for order snapshot persistence, Kakao sender success/failure behavior, multi-option product lookup, and ordered-option deletion.
 - `./gradlew serviceTest --tests "gift.order.OrderConcurrencyServiceTest" --rerun-tasks` - passed against Docker Compose MySQL test database after Product/Member transaction-boundary concurrency handling.
 - Cucumber feature files added under `src/test/resources/features`; step definitions and runner are not configured yet.
 - `./gradlew build --rerun-tasks` - passed.
@@ -188,4 +188,4 @@ Object-specific implementation checklist is tracked in `docs/refactoring-change-
 - Black-box test design: organized current API behavior into Cucumber feature files for member, category, product, option, wish, and order workflows.
 - Runtime environment setup: added `.env.example`, documented local `.env` usage, MySQL startup, and Kakao Login consent items.
 - Member API behavior analysis: added tests for registration/login success and failure cases, then changed concurrent duplicate registration to return `400 Bad Request` with the duplicate-email message.
-- Order modeling and concurrency analysis: added service-level stock/snapshot/point concurrency tests, introduced Product/Member optimistic versions, routed option stock changes through the Product aggregate root, removed forced flushes, and moved Kakao messages to after-commit.
+- Order modeling and concurrency analysis: added service-level stock/snapshot/point concurrency tests, introduced Product/Member optimistic versions, routed option stock changes through the Product aggregate root, removed forced flushes, moved Kakao messages to an after-commit async event listener, and verified event publication with a narrow Mockito unit test.

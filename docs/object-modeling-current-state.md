@@ -137,7 +137,7 @@ DB에서는 `member_id` FK만 갖고 `product_id`는 FK가 아니며, JPA 모델
 | `Category` | Yes | none | DB FK는 없고 Product가 삭제된 category id를 값으로 보관할 수 있다. | 상품이 없어도 카테고리는 존재할 수 있는 독립 기준 데이터이다. |
 | `Member` | Yes | none | Referenced `Wish` 또는 `Order`가 있으면 DB FK가 삭제를 막는다. | 회원은 독립적으로 가입/생성되지만 위시와 주문의 소유자가 된다. |
 | `Product` | Yes, after valid `categoryId` is provided | none as aggregate parent | `Option`은 Product 컬렉션의 orphan이고, Wish/Order는 Product 삭제를 DB FK로 막지 않는다. | Product는 Aggregate root이고 Option을 소유한다. Category는 객체 참조가 아니라 id 값이다. |
-| `Option` | No | `Product` | Order FK가 없으므로 주문 이력은 옵션 삭제를 DB에서 막지 않는다. | 옵션은 상품의 선택지/재고 단위라 상품 없이 존재할 수 없다. |
+| `Option` | No | `Product` | Order FK가 없으므로 주문 이력은 옵션 삭제를 DB에서 막지 않는다. | 옵션은 상품의 선택지/재고 단위라 상품 없이 존재할 수 없다. 주문된 옵션도 Product Aggregate 규칙상 삭제 가능하면 삭제되고, Order는 기존 option id와 스냅샷을 유지한다. |
 | `Wish` | Yes, after valid `memberId` and `productId` are provided | none as aggregate parent | none from other current tables | 위시는 별도 루트로 두고 회원/상품은 객체 참조가 아니라 id 값으로 연결한다. DB FK는 회원 row 존재만 요구하며, Product 삭제 후에는 product row가 없는 Wish가 남을 수 있다. |
 | `Order` | Yes, after valid member/product/option ids are provided | none as aggregate parent | none from other current tables | 주문은 불변 이력 루트로 두고 생성 당시 id 값과 표시용 스냅샷을 보관한다. Product/Option 삭제 또는 변경 후에도 주문 이력 row는 주문 당시 데이터를 보여줄 수 있다. |
 
@@ -157,7 +157,7 @@ DB에서는 `member_id` FK만 갖고 `product_id`는 FK가 아니며, JPA 모델
 | `Option` | `options.id` | `Product` | `Option.subtractQuantity`, `OptionNameValidator`, `OptionController` | 옵션은 `product_id not null`이고 상품 하위 API에서 생성/조회/삭제된다. |
 | `Member` | `member.id` | none directly | `Member.chargePoint`, `Member.deductPoint`, `Member.updateKakaoAccessToken` | 회원은 독립 테이블이고 위시/주문은 `member_id` 원시 FK로 연결된다. |
 | `Wish` | `wish.id` | `memberId`, `productId` | `Wish.isOwnedBy`, `AddWishService`, `RemoveWishService` | 위시는 별도 테이블/루트이며 회원과 상품을 객체 참조가 아니라 id 값으로 보관한다. |
-| `Order` | `orders.id` | `productId`, `optionId`, `memberId`, 주문 스냅샷 | `CreateOrderService`, `Product.subtractOptionQuantity`, `Member.deductPoint` | 주문 생성 흐름은 옵션 재고, 회원 포인트, 주문 저장, Kakao afterCommit 메시지를 함께 처리한다. 목록은 저장된 스냅샷을 사용한다. |
+| `Order` | `orders.id` | `productId`, `optionId`, `memberId`, 주문 스냅샷 | `CreateOrderService`, `Product.subtractOptionQuantity`, `Member.deductPoint` | 주문 생성 흐름은 옵션 재고, 회원 포인트, 주문 저장을 처리한다. 목록과 Kakao 메시지는 저장된 스냅샷을 사용한다. |
 
 ## Coupling and External Integration
 
@@ -341,8 +341,10 @@ Thymeleaf 모델을 직접 다룬다.
 3. `Product.subtractOptionQuantity(optionId, quantity)`로 Product 루트를 통해 옵션 재고를 차감한다.
 4. `Member.deductPoint(product.price * quantity)`로 포인트를 차감한다.
 5. `Order`는 `productId`, `optionId`, `memberId` 값과 상품명, 옵션명, 단가, 이미지 URL 스냅샷으로 저장한다.
-6. Kakao access token이 있으면 저장된 Order 스냅샷을 사용해 afterCommit에서 best-effort로 메시지를 전송한다.
-7. 트랜잭션 경계에서 발생한 `ConcurrencyFailureException`은 공통 API 예외 처리에서 `409 Conflict`로 변환한다.
+6. Kakao access token이 있으면 저장된 Order 스냅샷으로 `OrderCreatedEvent`를 발행한다.
+7. `KakaoOrderMessageListener`는 `@TransactionalEventListener(AFTER_COMMIT)`와 `@Async`로 트랜잭션 성공 이후 비동기 best-effort 메시지를 전송한다.
+8. 실제 Kakao 전송은 외부 연동 포트인 `KakaoMessageSender`를 통해 수행하며, `KakaoMessageClient`가 이를 구현한다.
+9. 트랜잭션 경계에서 발생한 `ConcurrencyFailureException`은 공통 API 예외 처리에서 `409 Conflict`로 변환한다.
 
 주문 생성 후 위시 삭제는 아직 구현되지 않았다.
 
@@ -360,7 +362,7 @@ Thymeleaf 모델을 직접 다룬다.
 | 위시 소유자만 삭제 가능 | `Wish.isOwnedBy`, `RemoveWishService` |
 | 주문 금액 계산 | `CreateOrderService.execute` |
 | 주문 목록 표시 데이터 | `Order` 스냅샷 필드, `OrderResponse.from` |
-| Kakao 메시지 전송 실패 무시 | `CreateOrderService.sendKakaoMessageIfPossible` |
+| Kakao 메시지 전송 실패 무시 | `KakaoOrderMessageListener.handle`, `KakaoMessageSender` |
 | 주문 동시성 API 응답 | `GlobalExceptionHandler.handleConcurrencyFailure` |
 
 ## Current Structural Observations

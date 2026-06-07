@@ -19,6 +19,10 @@
 코드 스타일 기준으로 `saveAndFlush`는 사용하지 않는다. 저장은 `save`로 수행하고
 flush는 메서드 단위 트랜잭션 경계에서 발생하도록 둔다.
 
+테스트는 기본적으로 Mockito를 사용하지 않고 fake/stub을 둔다. 다만 사용자가 명시적으로
+중요한 이벤트 발행 경계의 상호작용 검증을 요청한 경우에는 해당 단위 테스트에 한해
+Mockito `verify(times/never)`를 사용한다.
+
 ## 완료된 구조 해결
 
 | 커밋 | 변경점 | 의미 |
@@ -39,7 +43,7 @@ flush는 메서드 단위 트랜잭션 경계에서 발생하도록 둔다.
 | `81ebc15` | Order 생성 UseCase 서비스를 도입했다. | 주문 생성 로직을 컨트롤러에서 서비스로 옮기고 포인트/재고 동시성 문제를 서비스 테스트로 드러냈다. |
 | `현재 작업` | 옵션 재고 변경을 Product 루트 경유로 변경했다. | Product Aggregate root 기준으로 옵션 재고 변경과 낙관적 락 경계를 맞췄다. |
 | `현재 작업` | Order가 Product/Option을 객체가 아니라 id 값과 주문 당시 스냅샷으로 보관하게 했다. | 주문 이력을 별도 루트로 두고 Product/Option 삭제/변경 정책과 주문 이력 표시를 분리했다. |
-| `현재 작업` | Kakao 메시지를 주문 트랜잭션 afterCommit으로 이동했다. | 외부 부수효과가 DB 트랜잭션 성공 전 발생하지 않도록 했다. |
+| `현재 작업` | Kakao 메시지를 Spring 이벤트 기반 afterCommit 비동기 listener와 `KakaoMessageSender` 포트로 이동했다. | 외부 부수효과가 DB 트랜잭션 성공 전 발생하지 않고, API 응답 시간을 막지 않도록 했다. 이벤트 발행 여부는 Mockito `verify(times/never)`로, 외부 전송은 fake sender로 검증한다. |
 
 ## 완료된 문제 해결
 
@@ -54,7 +58,7 @@ flush는 메서드 단위 트랜잭션 경계에서 발생하도록 둔다.
 | `현재 작업` | 주문 생성 서비스가 `saveAndFlush`로 중간 flush를 강제하고 낙관적 락 예외를 트랜잭션 내부에서 변환했다. | 중간 flush를 제거하고 트랜잭션 경계에서 발생한 동시성 실패를 공통 API 예외 처리에서 `409 Conflict`로 변환한다. |
 | `현재 작업` | 주문 이력이 `Option` 엔티티와 DB FK에 묶여 있어 옵션 삭제 정책이 주문 FK에 의해 결정됐다. | `orders.product_id`를 추가하고 `orders.option_id` FK를 제거해 주문 이력은 생성 당시 id 값과 스냅샷을 보관하게 했다. |
 | `현재 작업` | Order 목록이 현재 Product/Option을 조회하면 과거 주문의 상품명, 옵션명, 가격이 바뀌어 보일 수 있었다. | Order에 상품명, 옵션명, 단가, 이미지 URL 스냅샷을 저장하고 목록 응답은 이 값을 사용한다. |
-| `현재 작업` | Kakao 메시지가 주문 트랜잭션 성공 전에 전송될 수 있었다. | 메시지에 필요한 값을 캡처한 뒤 afterCommit에서 best-effort로 전송한다. |
+| `현재 작업` | Kakao 메시지가 주문 트랜잭션 성공 전에 전송되거나 afterCommit 동기 처리로 응답 시간을 지연시킬 수 있었다. | 메시지에 필요한 스냅샷을 이벤트로 발행하고 `@TransactionalEventListener(AFTER_COMMIT)` + `@Async` listener에서 `KakaoMessageSender` 포트를 통해 best-effort로 전송한다. |
 
 ## 식별된 정책 변경
 
@@ -83,10 +87,10 @@ flush는 메서드 단위 트랜잭션 경계에서 발생하도록 둔다.
 | --- | --- | --- | --- | --- |
 | `Category` | 완료: `CategoryContractTest` | 완료: `CategoryServiceTest`, `CategoryApiTest` | 완료: controller, domain, service, usecase 패키지 분리 | 삭제 정책 정의 완료: Product와 무관하게 삭제하고 누락된 Category는 `미분류 카테고리`로 표시한다. |
 | `Product` | 완료: `ProductContractTest` | 완료: `ProductUseCaseServiceTest`, 관리자 상품 미분류 API 테스트, 주문 재고 동시성 서비스 테스트 | 진행 중: Product 패키지와 UseCase 서비스가 존재한다. | Wish 관련 삭제 정책과 주문 재고 동시성은 완료. Order는 Product id 값만 보관하므로 Product 삭제와 주문 이력은 분리됐다. |
-| `Option` | 부분 완료: product/option 서비스 테스트로 일부 커버하지만 독립 계약 테스트는 아직 없다. | 완료: `ProductOptionUseCaseServiceTest`, `OrderConcurrencyServiceTest` | 진행 중: Option 동작은 Product usecase/service 흐름 아래에 있고, 재고 차감은 Product 루트 메서드로 수행한다. `OptionRepository`는 조회/관리 흐름에 유지 중이다. | Order는 Option id 값만 보관하므로 Option 삭제와 주문 이력은 분리됐다. |
+| `Option` | 부분 완료: product/option 서비스 테스트로 일부 커버하지만 독립 계약 테스트는 아직 없다. | 완료: `ProductOptionUseCaseServiceTest`, `OrderServiceTest`, `OrderConcurrencyServiceTest` | 진행 중: Option 동작은 Product usecase/service 흐름 아래에 있고, 재고 차감은 Product 루트 메서드로 수행한다. `OptionRepository`는 조회/관리 흐름에 유지 중이다. | Order는 Option id와 스냅샷만 보관하므로 주문된 Option도 Product Aggregate 규칙상 삭제 가능하면 삭제된다. |
 | `Member` | 미완료: 포인트와 식별성 규칙 계약 테스트가 필요하다. | 완료: 회원가입/로그인 API, 회원가입 서비스 테스트, 주문 포인트 동시성 서비스 테스트 | 부분 완료: 회원가입 UseCase 서비스는 존재하고 로그인/관리자 회원 로직은 아직 컨트롤러에 남아 있다. | 중복 회원가입과 주문 포인트 차감 동시성은 해결됐고, Wish/Order가 있을 때의 Member 삭제 정책이 더 필요하다. |
 | `Wish` | 완료: `WishContractTest` | 완료: `WishServiceTest`, `WishApiTest` | 완료: controller, domain, service, usecase 패키지 분리, 추가/목록/삭제 UseCase 서비스 추출, `Member`/`Product` 직접 객체 참조 제거, 목록 응답용 `wish`-`product` 조인 쿼리 분리 | 현재 API 정책은 정의됨: 인증 필요, 중복 추가는 기존 Wish 반환, 삭제는 소유자만 가능. Product가 없는 Wish는 목록에서 미노출한다. 동시 중복 추가와 Product/Member 삭제 정책은 남아 있다. |
-| `Order` | 부분 완료: `OrderContractTest` | 부분 완료: `OrderServiceTest`, `OrderConcurrencyServiceTest` | 진행 중: 생성 UseCase 서비스가 존재하고 목록 UseCase 서비스는 아직 없다. Order는 `productId`, `optionId`, `memberId` 값과 주문 당시 스냅샷을 보관한다. | 재고/포인트 동시성, 주문 목록 스냅샷, Kakao afterCommit은 해결됐다. Wish 정리 동작은 아직 남아 있다. |
+| `Order` | 부분 완료: `OrderContractTest`, `CreateOrderServiceTest`, `KakaoOrderMessageListenerTest` | 부분 완료: `OrderServiceTest`, `OrderConcurrencyServiceTest` | 진행 중: 생성 UseCase 서비스가 존재하고 목록 UseCase 서비스는 아직 없다. Order는 `productId`, `optionId`, `memberId` 값과 주문 당시 스냅샷을 보관한다. | 재고/포인트 동시성, 주문 목록 스냅샷, Kakao afterCommit async는 해결됐다. Wish 정리 동작은 아직 남아 있다. |
 
 ## 객체별 리팩터링 TODO
 
@@ -97,7 +101,7 @@ flush는 메서드 단위 트랜잭션 경계에서 발생하도록 둔다.
 | `Option` | 부분 완료: Product 패키지 아래에서 목록/생성/삭제 UseCase 존재 | 현재 Option 서비스는 완료, 이후 수정 흐름 추가 시 경계 필요 | 완료: `Option`은 별도 root가 아니라 `Product`에 소유된다 | 주문 재고 차감 동시성은 Product 루트 version으로 해결, TODO: 중복 Option 생성, Order 존재 중 삭제 확인 |
 | `Member` | 부분 완료: 회원가입 UseCase 존재, 로그인/관리자 생성/수정/삭제/포인트 충전 UseCase 필요 | 부분 완료: 회원가입과 주문 포인트 차감 서비스 경계 존재, 로그인/관리자 기능 검토 필요 | TODO: Wish, Order, Point, Kakao access token을 기준으로 `Member` root 경계 확인 | 중복 회원가입과 주문 포인트 차감은 완료, TODO: 동시 포인트 충전과 Member 삭제 확인 |
 | `Wish` | 완료: 추가, 목록, 삭제 UseCase 식별 및 서비스 구현 | 완료: Wish 서비스는 메서드 단위 `@Transactional` 사용 | 완료: `Wish`는 별도 루트이며 `memberId`, `productId` 값만 보관한다. 삭제 소유권은 `memberId`로 검증한다. | TODO: 동시 중복 Wish 추가와 소유권 기반 삭제 경쟁 확인 |
-| `Order` | 부분 완료: 생성 UseCase 서비스 존재, 목록 UseCase 서비스 구현 필요 | 부분 완료: 생성 서비스는 메서드 단위 `@Transactional` 사용 | 완료: `Order`는 불변 이력 Aggregate root로 보고 Product/Option/Member를 id 값과 주문 당시 스냅샷으로 보관한다 | 재고/포인트 차감 동시성, 목록 스냅샷, Kakao afterCommit은 완료, TODO: Wish 정리 확인 |
+| `Order` | 부분 완료: 생성 UseCase 서비스 존재, 목록 UseCase 서비스 구현 필요 | 부분 완료: 생성 서비스는 메서드 단위 `@Transactional` 사용 | 완료: `Order`는 불변 이력 Aggregate root로 보고 Product/Option/Member를 id 값과 주문 당시 스냅샷으로 보관한다 | 재고/포인트 차감 동시성, 목록 스냅샷, Kakao afterCommit async는 완료, TODO: Wish 정리 확인 |
 
 ## 예정 작업
 
@@ -149,7 +153,7 @@ flush는 메서드 단위 트랜잭션 경계에서 발생하도록 둔다.
 - [x] 현재 Option UseCase 서비스를 Product 패키지 아래에 추출한다.
 - [x] `Option`은 별도 Aggregate root가 아니라 `Product` 소유 객체로 본다.
 - [ ] Option 이름, 수량, 재고 규칙에 대한 독립 계약 테스트를 추가한다.
-- [x] Order가 Option을 참조할 때 삭제 정책을 정의한다: Order는 option id 값과 옵션명 스냅샷을 보관한다.
+- [x] Order가 Option을 참조할 때 삭제 정책을 정의한다: Order는 option id 값과 옵션명 스냅샷을 보관하고, 주문된 Option도 Product Aggregate 규칙상 삭제 가능하면 삭제된다.
 - [x] 삭제/변경된 Option id를 가진 Order 목록 표시 정책을 정의한다: 주문 당시 옵션 스냅샷을 표시한다.
 - [ ] 동시 재고 변경, 중복 Option 생성, Order 존재 중 삭제를 검토한다.
 
@@ -184,12 +188,16 @@ flush는 메서드 단위 트랜잭션 경계에서 발생하도록 둔다.
 - [x] 생성 UseCase를 식별한다.
 - [ ] 목록 UseCase 서비스를 구현한다.
 - [x] 재고, 포인트 차감, 불변 주문 이력 규칙 계약 테스트를 추가한다.
-- [ ] 주문 이력, Kakao 부수효과, Wish 정리 서비스/API 테스트를 추가한다.
+- [x] 주문 이력 스냅샷 서비스 테스트를 추가한다.
+- [x] Kakao 이벤트 발행 단위 테스트와 afterCommit 비동기 전송 서비스 테스트를 추가한다.
+- [x] 주문된 Option 삭제 후 Order 이력이 유지되는 서비스 테스트를 추가한다.
+- [ ] 주문 이력 API 테스트를 추가한다.
+- [ ] 주문 생성 후 Wish 정리 서비스/API 테스트를 추가한다.
 - [ ] 컨트롤러 로직을 하나의 API 동작당 하나의 UseCase 서비스로 추출한다.
 - [x] `Order`를 불변 이력 Aggregate root로 보고 Product/Option/Member 직접 객체 참조를 제거한다.
 - [x] Order 목록과 Kakao 메시지에 필요한 상품명, 옵션명, 단가, 이미지 URL을 주문 당시 스냅샷으로 보관한다.
 - [x] 생성 서비스 추출 후 메서드 단위 트랜잭션 경계를 추가한다.
-- [x] Kakao 메시지 전송을 주문 트랜잭션 성공 이후로 이동한다.
+- [x] Kakao 메시지 전송을 Spring 이벤트 기반 afterCommit 비동기 listener로 이동한다.
 - [ ] 주문 생성 후 구매자와 주문 상품의 Wish 정리를 구현한다.
 - [x] 동시 재고 차감과 포인트 차감을 검토한다.
 

@@ -5,15 +5,16 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestClient;
 
 @Component
-public class KakaoMessageClient {
+public class KakaoMessageClient implements KakaoMessageSender {
     private final RestClient restClient;
 
     public KakaoMessageClient(RestClient.Builder builder) {
         this.restClient = builder.build();
     }
 
-    public void sendToMe(String accessToken, Order order) {
-        var templateObject = buildTemplate(order);
+    @Override
+    public void sendToMe(String accessToken, KakaoOrderMessage message) {
+        var templateObject = buildTemplate(message);
 
         var params = new LinkedMultiValueMap<String, String>();
         params.add("template_object", templateObject);
@@ -27,10 +28,10 @@ public class KakaoMessageClient {
             .toBodilessEntity();
     }
 
-    private String buildTemplate(Order order) {
-        var totalPrice = String.format("%,d", order.getUnitPrice() * order.getQuantity());
-        var message = order.getMessage() != null && !order.getMessage().isBlank()
-            ? "\\n\\n💌 " + order.getMessage()
+    private String buildTemplate(KakaoOrderMessage message) {
+        var totalPrice = String.format("%,d", message.unitPrice() * message.quantity());
+        var giftMessage = message.message() != null && !message.message().isBlank()
+            ? "\\n\\n💌 " + message.message()
             : "";
         return """
             {
@@ -40,11 +41,11 @@ public class KakaoMessageClient {
                 "button_title": "선물 확인하기"
             }
             """.formatted(
-            order.getProductName(),
-            order.getOptionName(),
-            order.getQuantity(),
+            message.productName(),
+            message.optionName(),
+            message.quantity(),
             totalPrice,
-            message
+            giftMessage
         );
     }
 }

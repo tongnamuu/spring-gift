@@ -8,18 +8,29 @@ import gift.product.entity.Option;
 import gift.product.entity.Product;
 import gift.product.repository.OptionRepository;
 import gift.product.repository.ProductRepository;
+import gift.product.usecase.DeleteOptionUseCase;
 import gift.support.AbstractMysqlServiceTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.NoSuchElementException;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@Import(OrderServiceTest.KakaoMessageTestConfig.class)
 class OrderServiceTest extends AbstractMysqlServiceTest {
     private static final String TEST_EMAIL_PREFIX = "order-service-";
     private static final String TEST_CATEGORY_PREFIX = "os-cat-";
@@ -51,16 +62,24 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
     private OptionRepository optionRepository;
 
     @Autowired
+    private DeleteOptionUseCase deleteOptionUseCase;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private RecordingKakaoMessageSender kakaoMessageClient;
 
     @BeforeEach
     void setUp() {
+        kakaoMessageClient.reset();
         deleteTestData();
     }
 
     @AfterEach
     void tearDown() {
         deleteTestData();
+        kakaoMessageClient.reset();
     }
 
     @Test
@@ -105,6 +124,75 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
         assertThat(findOptionQuantity(secondOption.getId())).isEqualTo(17);
     }
 
+    @Test
+    void kakaoMessageIsSentAfterSuccessfulOrderCommit() throws Exception {
+        Member member = saveKakaoMember("success", 100000);
+        Category category = saveCategory();
+        Product product = saveProduct(category);
+        Option option = optionRepository.save(new Option(product, ORIGINAL_OPTION_NAME, 10));
+
+        createOrderUseCase.execute(
+            member.getId(),
+            new OrderRequest(option.getId(), 2, "성공 메시지")
+        );
+
+        assertThat(kakaoMessageClient.awaitMessage(2000)).isTrue();
+        assertThat(kakaoMessageClient.sendCount()).isEqualTo(1);
+        assertThat(kakaoMessageClient.sentMessages()).hasSize(1);
+        assertThat(kakaoMessageClient.sentMessages().get(0).productName()).isEqualTo(ORIGINAL_PRODUCT_NAME);
+        assertThat(kakaoMessageClient.sentMessages().get(0).optionName()).isEqualTo(ORIGINAL_OPTION_NAME);
+        assertThat(kakaoMessageClient.sentMessages().get(0).unitPrice()).isEqualTo(ORIGINAL_UNIT_PRICE);
+        assertThat(kakaoMessageClient.sentMessages().get(0).quantity()).isEqualTo(2);
+    }
+
+    @Test
+    void kakaoMessageIsNotSentWhenOrderCreationFails() throws Exception {
+        Member member = saveKakaoMember("failure", 1000);
+        Category category = saveCategory();
+        Product product = saveProduct(category);
+        Option option = optionRepository.save(new Option(product, ORIGINAL_OPTION_NAME, 10));
+
+        assertThatThrownBy(() -> createOrderUseCase.execute(
+            member.getId(),
+            new OrderRequest(option.getId(), 1, "실패 메시지")
+        )).isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(kakaoMessageClient.awaitMessage(300)).isFalse();
+        assertThat(kakaoMessageClient.sendCount()).isZero();
+        assertThat(kakaoMessageClient.sentMessages()).isEmpty();
+        assertThat(countOrdersByMember(member.getId())).isZero();
+        assertThat(findOptionQuantity(option.getId())).isEqualTo(10);
+    }
+
+    @Test
+    void orderedOptionCanBeDeletedAndOrderKeepsOptionSnapshot() {
+        Member member = saveMember();
+        Category category = saveCategory();
+        Product product = saveProduct(category);
+        Option orderedOption = optionRepository.save(new Option(product, ORIGINAL_OPTION_NAME, 10));
+        Option remainingOption = optionRepository.save(new Option(product, "2026년 재배 햅쌀", 20));
+
+        OrderResponse created = createOrderUseCase.execute(
+            member.getId(),
+            new OrderRequest(orderedOption.getId(), 2, "주문된 옵션 삭제 정책")
+        );
+
+        deleteOptionUseCase.execute(product.getId(), orderedOption.getId());
+
+        OrderResponse listed = orderRepository.findByMemberId(member.getId(), Pageable.unpaged())
+            .map(OrderResponse::from)
+            .getContent()
+            .get(0);
+        assertThat(optionRepository.existsById(orderedOption.getId())).isFalse();
+        assertThat(optionRepository.existsById(remainingOption.getId())).isTrue();
+        assertThat(countOrdersByMember(member.getId())).isEqualTo(1L);
+        assertThat(created.optionId()).isEqualTo(orderedOption.getId());
+        assertThat(listed.optionId()).isEqualTo(orderedOption.getId());
+        assertThat(listed.optionName()).isEqualTo(ORIGINAL_OPTION_NAME);
+        assertThat(listed.productName()).isEqualTo(ORIGINAL_PRODUCT_NAME);
+        assertThat(listed.unitPrice()).isEqualTo(ORIGINAL_UNIT_PRICE);
+    }
+
     private void assertSnapshot(OrderResponse response) {
         assertThat(response.productName()).isEqualTo(ORIGINAL_PRODUCT_NAME);
         assertThat(response.optionName()).isEqualTo(ORIGINAL_OPTION_NAME);
@@ -117,6 +205,13 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
     private Member saveMember() {
         Member member = new Member(TEST_EMAIL_PREFIX + "snapshot@example.com", "password123");
         member.chargePoint(100000);
+        return memberRepository.save(member);
+    }
+
+    private Member saveKakaoMember(String suffix, int point) {
+        Member member = new Member(TEST_EMAIL_PREFIX + suffix + "@example.com", "password123");
+        member.chargePoint(point);
+        member.updateKakaoAccessToken("kakao-access-token-" + suffix);
         return memberRepository.save(member);
     }
 
@@ -153,6 +248,14 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
         );
     }
 
+    private long countOrdersByMember(Long memberId) {
+        return jdbcTemplate.queryForObject(
+            "select count(*) from orders where member_id = ?",
+            Long.class,
+            memberId
+        );
+    }
+
     private void deleteTestData() {
         jdbcTemplate.update(
             "delete from orders where member_id in (select id from member where email like ?)",
@@ -174,5 +277,59 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
         jdbcTemplate.update("delete from product where name like ?", TEST_PRODUCT_PREFIX + "%");
         jdbcTemplate.update("delete from category where name like ?", TEST_CATEGORY_PREFIX + "%");
         jdbcTemplate.update("delete from member where email like ?", TEST_EMAIL_PREFIX + "%");
+    }
+
+    @TestConfiguration
+    static class KakaoMessageTestConfig {
+        @Bean
+        @Primary
+        RecordingKakaoMessageSender recordingKakaoMessageSender() {
+            return new RecordingKakaoMessageSenderFake();
+        }
+    }
+
+    interface RecordingKakaoMessageSender extends KakaoMessageSender {
+        void reset();
+
+        boolean awaitMessage(long timeoutMillis) throws InterruptedException;
+
+        int sendCount();
+
+        CopyOnWriteArrayList<KakaoOrderMessage> sentMessages();
+    }
+
+    static class RecordingKakaoMessageSenderFake implements RecordingKakaoMessageSender {
+        private final AtomicInteger sendCount = new AtomicInteger();
+        private final CopyOnWriteArrayList<KakaoOrderMessage> sentMessages = new CopyOnWriteArrayList<>();
+        private CountDownLatch latch = new CountDownLatch(1);
+
+        @Override
+        public void sendToMe(String accessToken, KakaoOrderMessage message) {
+            sendCount.incrementAndGet();
+            sentMessages.add(message);
+            latch.countDown();
+        }
+
+        @Override
+        public void reset() {
+            sendCount.set(0);
+            sentMessages.clear();
+            latch = new CountDownLatch(1);
+        }
+
+        @Override
+        public boolean awaitMessage(long timeoutMillis) throws InterruptedException {
+            return latch.await(timeoutMillis, TimeUnit.MILLISECONDS);
+        }
+
+        @Override
+        public int sendCount() {
+            return sendCount.get();
+        }
+
+        @Override
+        public CopyOnWriteArrayList<KakaoOrderMessage> sentMessages() {
+            return sentMessages;
+        }
     }
 }
