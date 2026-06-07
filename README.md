@@ -72,6 +72,7 @@ Current policy:
 
 - `Product.version` protects option stock changes at the Product aggregate boundary.
 - `Product.update_dt` is refreshed when Product fields change or options are added, removed, or decremented.
+- If order stock deduction and option deletion load the same Product version concurrently, exactly one transaction commits and the other fails through Product optimistic locking.
 - `Member.version` protects point deduction.
 - Order lists use the stored order snapshot, not the current Product/Option state.
 - The service does not force `saveAndFlush`; Product and Member changes are flushed at the transaction boundary.

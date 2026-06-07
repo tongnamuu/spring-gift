@@ -74,6 +74,7 @@ Mockito `verify(times/never)`를 사용한다.
 | `현재 작업` | Kakao 메시지가 주문 트랜잭션 성공 전에 전송되거나 afterCommit 동기 처리로 응답 시간을 지연시킬 수 있었다. | 메시지에 필요한 스냅샷을 이벤트로 발행하고 `@TransactionalEventListener(AFTER_COMMIT)` + `@Async` listener에서 `KakaoMessageSender` 포트를 통해 best-effort로 전송한다. |
 | `현재 작업` | 주문 생성 후 Wish를 장바구니처럼 정리해야 한다는 이전 가정이 반복 구매 상품 정책과 맞지 않았다. | 주문 성공 후에도 Wish는 유지한다. Wish는 반복 구매 후보이고 Order는 구매 이력이다. |
 | `현재 작업` | 두 옵션을 동시에 삭제하면 둘 다 성공해 상품에 옵션이 하나도 남지 않을 수 있었다. | `Product.version` 경계에서 삭제 충돌을 감지하고, 상품에는 최소 1개의 옵션이 남아야 한다는 규칙을 서비스/API 테스트로 고정했다. 마지막 옵션 삭제 메시지는 `옵션이 1개인 상품은 옵션을 삭제할 수 없습니다.`이다. |
+| `현재 작업` | 주문으로 옵션 재고를 차감하는 동시에 같은 Product의 옵션이 삭제될 수 있다. | 두 트랜잭션이 같은 Product version을 읽으면 하나만 커밋되고 다른 하나는 optimistic lock failure로 실패한다는 서비스 테스트를 추가했다. |
 
 ## 식별된 정책 변경
 
@@ -81,7 +82,7 @@ Mockito `verify(times/never)`를 사용한다.
 | --- | --- | --- | --- | --- |
 | `Category` | Product가 참조하는 Category는 DB FK 또는 명시적 존재 체크 때문에 삭제할 수 없다고 봤다. | Category 생명주기가 Product에 너무 강하게 묶였다. Product는 삭제된 Category id를 갖고도 목록에 표시될 수 있다. | Category 삭제는 Product와 독립적으로 허용한다. Product를 이동하거나 삭제하지 않고, Category row가 없으면 `미분류 카테고리`로 표시한다. | `c72940d`, `CategoryServiceTest`, `CategoryApiTest`, `AdminProductApiTest` |
 | `Product` | Product가 Category 객체를 직접 갖거나 직접 의존한다고 봤다. | Product -> Category 객체 결합 때문에 Aggregate 경계가 흐려졌다. | Product는 `categoryId` 값만 저장한다. Product와 Category는 서로 다른 Aggregate root이다. | `3e01cfa`, `ProductContractTest` |
-| `Product/Option` | 주문 생성 시 `OptionRepository`로 Option을 직접 조회해 재고를 차감했다. | Option은 Product Aggregate 내부 객체인데 주문 흐름이 루트를 우회했고, 동시 주문에서 같은 옵션 재고가 초과 판매될 수 있었다. | 옵션 재고 변경은 Product 루트의 `subtractOptionQuantity`로 수행한다. Product는 `version`과 `update_dt`를 갖고 옵션 추가/삭제/재고 차감 시 갱신된다. `OptionRepository`는 제거하고 쓰기 흐름은 Product 루트 저장으로 통일한다. | `ProductContractTest`, `OrderConcurrencyServiceTest`, `V6__Add_product_version.sql`, `V7__Add_product_update_dt.sql` |
+| `Product/Option` | 주문 생성 시 `OptionRepository`로 Option을 직접 조회해 재고를 차감했다. | Option은 Product Aggregate 내부 객체인데 주문 흐름이 루트를 우회했고, 동시 주문 또는 주문 중 옵션 변경에서 Product 상태가 충돌할 수 있었다. | 옵션 재고 변경은 Product 루트의 `subtractOptionQuantity`로 수행한다. Product는 `version`과 `update_dt`를 갖고 옵션 추가/삭제/재고 차감 시 갱신된다. `OptionRepository`는 제거하고 쓰기 흐름은 Product 루트 저장으로 통일한다. | `ProductContractTest`, `OrderConcurrencyServiceTest`, `V6__Add_product_version.sql`, `V7__Add_product_update_dt.sql` |
 | `Product/Option` | Product 조회 응답은 Product 필드만 반환하고 옵션은 별도 endpoint에서만 조회한다고 봤다. | 상품 조회자가 실제 판매 가능한 선택지/재고를 알기 위해 추가 요청을 강제받고, JPA 관계를 직접 노출하면 N+1 위험이 생긴다. | Product 단건/목록 조회 응답은 옵션 목록을 포함한다. Product/Option 조회 API는 `JdbcTemplate` query 객체가 명시적 SQL로 조립한다. 옵션 단독 목록 endpoint는 유지한다. | `ProductQueryDao`, `OptionQueryDao`, `ProductUseCaseServiceTest`, `ProductOptionUseCaseServiceTest` |
 | `Wish` | Wish가 `Product` 객체를 직접 들고, 회원은 `memberId` 값으로만 참조했다. | Wish를 별도 Aggregate root로 삼을 때 Product 객체 참조가 Product Aggregate와의 경계를 흐렸다. | Wish는 `memberId`, `productId` 값만 보관한다. 상품 정보가 필요한 응답 조립은 Wish UseCase 서비스에서 `ProductRepository`로 조회한다. | `WishContractTest`, `WishServiceTest`, `WishApiTest` |
 | `Product/Wish` | Product 삭제 시 `wish.product_id -> product.id` FK가 삭제를 막았다. | Product Aggregate 삭제 정책이 Wish Aggregate에 묶였다. | Product 삭제는 Wish를 수정/삭제하지 않는다. `wish.product_id` FK를 제거하고, Product가 없는 Wish는 목록에서 미노출한다. | `V4__Remove_wish_product_foreign_key.sql`, `ProductUseCaseServiceTest`, `WishServiceTest` |
@@ -114,8 +115,8 @@ Mockito `verify(times/never)`를 사용한다.
 | 객체 | UseCase 식별 | 트랜잭션 경계 확인 | 루트 객체 확인 | 동시성 문제 확인 |
 | --- | --- | --- | --- | --- |
 | `Category` | 완료: 생성, 목록, 수정, 삭제 UseCase 존재 | 완료: Category 서비스는 메서드 단위 `@Transactional` 사용 | 완료: `Category`는 Product 없이 존재할 수 있는 Aggregate root | TODO: 중복 Category 이름, 동시 수정/삭제 확인 |
-| `Product` | 현재 Product/Option 흐름은 완료, 관리자 Product UseCase 구현 검토 필요 | 부분 완료: Product 서비스는 메서드 단위 `@Transactional` 사용, 관리자 흐름 검토 필요 | 완료: `Product`는 Aggregate root이고 `categoryId`만 저장하며 `Option` 재고 변경을 루트 메서드로 수행한다 | 주문 재고 차감 동시성은 완료, TODO: Wish, Option, Order, 누락 Category와 동시 삭제/수정 경쟁 확인 |
-| `Option` | 부분 완료: Product 패키지 아래에서 목록/생성/삭제 UseCase 존재 | 현재 Option 서비스는 완료, 이후 수정 흐름 추가 시 경계 필요 | 완료: `Option`은 별도 root가 아니라 `Product`에 소유된다 | 주문 재고 차감 동시성은 Product 루트 version으로 해결, TODO: 중복 Option 생성, Order 존재 중 삭제 확인 |
+| `Product` | 현재 Product/Option 흐름은 완료, 관리자 Product UseCase 구현 검토 필요 | 부분 완료: Product 서비스는 메서드 단위 `@Transactional` 사용, 관리자 흐름 검토 필요 | 완료: `Product`는 Aggregate root이고 `categoryId`만 저장하며 `Option` 재고 변경을 루트 메서드로 수행한다 | 주문 재고 차감과 주문 중 옵션 삭제 동시성은 Product version으로 확인했다. TODO: Wish, Order, 누락 Category와 동시 삭제/수정 경쟁 확인 |
+| `Option` | 부분 완료: Product 패키지 아래에서 목록/생성/삭제 UseCase 존재 | 현재 Option 서비스는 완료, 이후 수정 흐름 추가 시 경계 필요 | 완료: `Option`은 별도 root가 아니라 `Product`에 소유된다 | 주문 재고 차감, 동시 옵션 삭제, 주문 중 옵션 삭제 충돌은 Product 루트 version으로 해결, TODO: 중복 Option 생성 확인 |
 | `Member` | 부분 완료: 회원가입 UseCase 존재, 로그인/관리자 생성/수정/삭제/포인트 충전 UseCase 필요 | 부분 완료: 회원가입과 주문 포인트 차감 서비스 경계 존재, 로그인/관리자 기능 검토 필요 | TODO: Wish, Order, Point, Kakao access token을 기준으로 `Member` root 경계 확인 | 중복 회원가입과 주문 포인트 차감은 완료, TODO: 동시 포인트 충전과 Member 삭제 확인 |
 | `Wish` | 완료: 추가, 목록, 삭제 UseCase 식별 및 서비스 구현 | 완료: Wish 서비스는 메서드 단위 `@Transactional` 사용 | 완료: `Wish`는 별도 루트이며 `memberId`, `productId` 값만 보관한다. 삭제 소유권은 `memberId`로 검증한다. | TODO: 동시 중복 Wish 추가와 소유권 기반 삭제 경쟁 확인 |
 | `Order` | 완료: 생성 UseCase 서비스와 목록 UseCase 서비스 존재 | 완료: 생성/목록 서비스는 메서드 단위 `@Transactional` 사용 | 완료: `Order`는 불변 이력 Aggregate root로 보고 Product/Option/Member를 id 값과 주문 당시 스냅샷으로 보관한다 | 재고/포인트 차감 동시성, 목록 스냅샷, Kakao afterCommit async, 주문 후 Wish 유지는 완료 |
@@ -177,6 +178,7 @@ Mockito `verify(times/never)`를 사용한다.
 - [x] 삭제/변경된 Option id를 가진 Order 목록 표시 정책을 정의한다: 주문 당시 옵션 스냅샷을 표시한다.
 - [x] 상품에는 최소 1개의 옵션이 남아야 한다는 삭제 정책을 정의한다.
 - [x] 동시에 옵션을 삭제해도 모든 옵션이 제거되지 않는지 서비스 테스트로 검증한다.
+- [x] 주문 재고 차감과 옵션 삭제가 동시에 발생하면 Product optimistic lock failure가 발생하는지 검증한다.
 - [ ] 동시 재고 변경, 중복 Option 생성, Order 존재 중 삭제를 추가 검토한다.
 
 ### Member

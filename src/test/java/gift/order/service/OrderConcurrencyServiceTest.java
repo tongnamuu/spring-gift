@@ -6,19 +6,25 @@ import gift.member.Member;
 import gift.member.MemberRepository;
 import gift.order.controller.OrderRequest;
 import gift.order.controller.OrderResponse;
+import gift.order.domain.Order;
+import gift.order.domain.OrderRepository;
 import gift.order.usecase.CreateOrderUseCase;
 import gift.product.dto.OptionRequest;
 import gift.product.dto.OptionResponse;
+import gift.product.entity.Option;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
 import gift.product.usecase.CreateOptionUseCase;
 import gift.support.AbstractMysqlServiceTest;
+import jakarta.persistence.OptimisticLockException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,6 +50,9 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
     private MemberRepository memberRepository;
 
     @Autowired
+    private OrderRepository orderRepository;
+
+    @Autowired
     private CategoryRepository categoryRepository;
 
     @Autowired
@@ -54,6 +63,9 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     @BeforeEach
     void setUp() {
@@ -99,6 +111,28 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
         assertThat(countOrdersByMember(member.getId())).isEqualTo(1L);
         assertThat(sumOptionQuantity(TEST_PRODUCT_PREFIX + "point-%")).isEqualTo(REQUEST_COUNT - 1);
         assertThat(findMemberPoint(member.getId())).isZero();
+    }
+
+    @Test
+    void concurrentOrderAndOptionDeleteConflictOnProductOptimisticLock() throws Exception {
+        Member member = saveMember("optchg", 100000);
+        Product product = saveProduct("optchg", 1000);
+        OptionResponse orderedOption = saveOption(product, "주문 옵션 optchg", 10);
+        OptionResponse deletedOption = saveOption(product, "삭제 옵션 optchg", 10);
+        long initialVersion = findProductVersion(product.getId());
+
+        List<ConcurrentMutationResult> results = runOrderStockChangeAndOptionDeleteConcurrently(
+            member.getId(),
+            product.getId(),
+            orderedOption.id(),
+            deletedOption.id()
+        );
+        List<Throwable> failures = mutationFailures(results);
+
+        assertThat(mutationSuccessCount(results)).isEqualTo(1L);
+        assertThat(failures).hasSize(1);
+        assertThat(isOptimisticLockFailure(failures.get(0))).isTrue();
+        assertThat(findProductVersion(product.getId())).isEqualTo(initialVersion + 1);
     }
 
     private void assertOrderFailure(Throwable failure) {
@@ -230,6 +264,100 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
         );
     }
 
+    private List<ConcurrentMutationResult> runOrderStockChangeAndOptionDeleteConcurrently(
+        Long memberId,
+        Long productId,
+        Long orderedOptionId,
+        Long deletedOptionId
+    ) throws Exception {
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<ConcurrentMutationResult> orderFuture = executorService.submit(
+                () -> orderAfterConcurrentLoad(memberId, orderedOptionId, ready, start)
+            );
+            Future<ConcurrentMutationResult> deleteFuture = executorService.submit(
+                () -> deleteOptionAfterConcurrentLoad(productId, deletedOptionId, ready, start)
+            );
+
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            return List.of(
+                orderFuture.get(10, TimeUnit.SECONDS),
+                deleteFuture.get(10, TimeUnit.SECONDS)
+            );
+        } finally {
+            executorService.shutdownNow();
+        }
+    }
+
+    private ConcurrentMutationResult orderAfterConcurrentLoad(
+        Long memberId,
+        Long optionId,
+        CountDownLatch ready,
+        CountDownLatch start
+    ) {
+        try {
+            transactionTemplate.executeWithoutResult(status -> {
+                Member member = memberRepository.findById(memberId).orElseThrow();
+                Product product = productRepository.findByOptionId(optionId).orElseThrow();
+                ready.countDown();
+                await(start);
+
+                Option option = product.subtractOptionQuantity(optionId, 1);
+                member.deductPoint(product.getPrice());
+                orderRepository.save(new Order(
+                    product.getId(),
+                    option.getId(),
+                    member.getId(),
+                    product.getName(),
+                    option.getName(),
+                    product.getPrice(),
+                    product.getImageUrl(),
+                    1,
+                    "옵션 변경 동시 주문"
+                ));
+            });
+            return ConcurrentMutationResult.success();
+        } catch (Throwable failure) {
+            return ConcurrentMutationResult.failure(failure);
+        }
+    }
+
+    private ConcurrentMutationResult deleteOptionAfterConcurrentLoad(
+        Long productId,
+        Long optionId,
+        CountDownLatch ready,
+        CountDownLatch start
+    ) {
+        try {
+            transactionTemplate.executeWithoutResult(status -> {
+                Product product = productRepository.findById(productId).orElseThrow();
+                ready.countDown();
+                await(start);
+
+                product.removeOption(optionId);
+                productRepository.save(product);
+            });
+            return ConcurrentMutationResult.success();
+        } catch (Throwable failure) {
+            return ConcurrentMutationResult.failure(failure);
+        }
+    }
+
+    private void await(CountDownLatch start) {
+        try {
+            if (!start.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Timed out while waiting to start concurrent mutations.");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting to start concurrent mutations.", e);
+        }
+    }
+
     private long successCount(List<CreateOrderResult> results) {
         return results.stream()
             .filter(CreateOrderResult::succeeded)
@@ -284,6 +412,14 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
         );
     }
 
+    private long findProductVersion(Long productId) {
+        return jdbcTemplate.queryForObject(
+            "select version from product where id = ?",
+            Long.class,
+            productId
+        );
+    }
+
     private int sumOptionQuantity(String productNamePattern) {
         Integer sum = jdbcTemplate.queryForObject(
             """
@@ -305,6 +441,35 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
             emailPattern
         );
         return sum == null ? 0 : sum;
+    }
+
+    private long mutationSuccessCount(List<ConcurrentMutationResult> results) {
+        return results.stream()
+            .filter(ConcurrentMutationResult::succeeded)
+            .count();
+    }
+
+    private List<Throwable> mutationFailures(List<ConcurrentMutationResult> results) {
+        return results.stream()
+            .filter(result -> !result.succeeded())
+            .map(ConcurrentMutationResult::failure)
+            .toList();
+    }
+
+    private boolean isOptimisticLockFailure(Throwable failure) {
+        return containsCause(failure, OptimisticLockingFailureException.class)
+            || containsCause(failure, OptimisticLockException.class);
+    }
+
+    private boolean containsCause(Throwable failure, Class<? extends Throwable> type) {
+        Throwable current = failure;
+        while (current != null) {
+            if (type.isInstance(current)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private void deleteTestData() {
@@ -343,4 +508,13 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
         }
     }
 
+    private record ConcurrentMutationResult(boolean succeeded, Throwable failure) {
+        private static ConcurrentMutationResult success() {
+            return new ConcurrentMutationResult(true, null);
+        }
+
+        private static ConcurrentMutationResult failure(Throwable failure) {
+            return new ConcurrentMutationResult(false, failure);
+        }
+    }
 }

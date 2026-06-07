@@ -379,6 +379,7 @@ Thymeleaf 모델을 직접 다룬다.
 - `CreateOrderService.execute`에는 메서드 단위 트랜잭션 경계가 있다.
 - 주문 생성 흐름에서 Product 루트 재고 차감, Member 포인트 차감, Order 저장이 같은 트랜잭션에서 실행된다.
 - 주문 생성 후 `saveAndFlush`로 중간 flush를 강제하지 않고 트랜잭션 경계에서 변경을 반영한다.
+- 주문 재고 차감과 옵션 삭제가 동시에 같은 Product version을 읽으면 하나만 커밋되고 다른 하나는 optimistic lock failure로 실패한다.
 - 주문 목록은 Product/Option 현재 상태를 다시 조회하지 않고 `JdbcTemplate` query DAO로 Order에 저장된 생성 당시 스냅샷을 반환한다.
 - 상품 단건/목록 조회는 `ProductQueryDao`로 Product와 Option 응답을 조립하고, 옵션 목록 조회는 `OptionQueryDao`로 처리한다.
 - 주문 생성은 Wish를 삭제하지 않는다.
