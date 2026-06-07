@@ -1,4 +1,4 @@
-package gift.category.service;
+package gift.category.query;
 
 import gift.category.controller.CategoryResponse;
 import gift.category.domain.CategoryRepository;

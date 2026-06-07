@@ -1,4 +1,4 @@
-package gift.order.service;
+package gift.order.query;
 
 import gift.order.controller.OrderResponse;
 import org.springframework.data.domain.Page;

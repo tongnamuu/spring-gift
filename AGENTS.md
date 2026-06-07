@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This is a Spring Boot 3.5 application using Gradle Kotlin DSL and Java 21. Main code lives under `src/main/java/gift`, organized by feature package: `product`, `category`, `member`, `wish`, `order`, and `auth`. Option code belongs under the Product feature because Product owns Option. Kotlin source roots also exist at `src/main/kotlin/gift`. Thymeleaf admin views are in `src/main/resources/templates/{member,product}`, static assets belong in `src/main/resources/static`, and Flyway migrations are in `src/main/resources/db/migration`. Tests should mirror the package structure under `src/test/java/gift` or `src/test/kotlin/gift`.
+This is a Spring Boot 3.5 application using Gradle Kotlin DSL and Java 21. Main code lives under `src/main/java/gift`, organized by feature package: `product`, `category`, `member`, `wish`, `order`, and `auth`. Domain packages can contain `controller`, `domain` or `entity`, `query`, `repository`, `service`, `usecase`, and validator/DTO packages as needed. Option code belongs under the Product feature because Product owns Option. Kotlin source roots also exist at `src/main/kotlin/gift`. Thymeleaf admin views are in `src/main/resources/templates/{member,product}`, static assets belong in `src/main/resources/static`, and Flyway migrations are in `src/main/resources/db/migration`. Tests should mirror the package structure under `src/test/java/gift` or `src/test/kotlin/gift`.
 
 ## Build, Test, and Development Commands
 
@@ -25,7 +25,7 @@ Before adding or changing a class, inspect the existing interface and neighborin
 
 Repositories should be created only for aggregate roots. Child entities such as `Option` must be changed through the owning aggregate root (`Product`) and saved through the root repository. Do not add a child repository just to bypass aggregate rules.
 
-Read APIs should use a dedicated `JdbcTemplate` query object instead of JPA entity traversal or derived repository queries. Object and aggregate relationship changes must not change query performance, join shape, or introduce N+1 behavior. Keep write UseCases on domain objects and repositories, and keep read models explicit with SQL that returns the API response shape.
+Read APIs should use query UseCase services and dedicated `JdbcTemplate` query objects instead of JPA entity traversal or derived repository queries. Put read UseCase implementations and query objects in the owning domain's `query` package. Object and aggregate relationship changes must not change query performance, join shape, or introduce N+1 behavior. Keep write UseCases on domain objects and repositories, and keep read models explicit with SQL that returns the API response shape. Command UseCase services must not inject or call query-package objects.
 
 ## Testing Guidelines
 

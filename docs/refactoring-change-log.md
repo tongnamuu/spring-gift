@@ -19,9 +19,11 @@
 코드 스타일 기준으로 `saveAndFlush`는 사용하지 않는다. 저장은 `save`로 수행하고
 flush는 메서드 단위 트랜잭션 경계에서 발생하도록 둔다.
 
-조회 API는 JPA 엔티티 탐색이나 derived repository query가 아니라 `JdbcTemplate`
-기반 query 객체로 구현한다. 객체와 Aggregate 관계를 바꾸는 구조 리팩터링이 조회
-성능, join 형태, N+1 발생 여부에 영향을 주지 않도록 읽기 모델을 SQL로 명시한다.
+조회 API는 JPA 엔티티 탐색이나 derived repository query가 아니라 query UseCase
+서비스와 `JdbcTemplate` 기반 query 객체로 구현한다. 객체와 Aggregate 관계를 바꾸는
+구조 리팩터링이 조회 성능, join 형태, N+1 발생 여부에 영향을 주지 않도록 읽기 모델을
+SQL로 명시한다. 조회 UseCase 구현체와 query 객체는 각 도메인의 `query` 패키지에
+두고, command UseCase 서비스에서는 query 패키지 객체를 주입하거나 호출하지 않는다.
 
 Repository는 Aggregate root에만 둔다. `Option`처럼 루트가 아닌 하위 객체는
 소유 루트인 `Product` 메서드로 변경하고 `ProductRepository.save(product)`로
@@ -57,6 +59,7 @@ Mockito `verify(times/never)`를 사용한다.
 | `현재 작업` | Kakao 메시지를 Spring 이벤트 기반 afterCommit 비동기 listener와 `KakaoMessageSender` 포트로 이동했다. | 외부 부수효과가 DB 트랜잭션 성공 전 발생하지 않고, API 응답 시간을 막지 않도록 했다. 이벤트 발행 여부는 Mockito `verify(times/never)`로, 외부 전송은 fake sender로 검증한다. |
 | `현재 작업` | `OptionRepository`를 제거하고 옵션 쓰기 흐름을 Product 루트 저장으로 통일했다. | Aggregate root repository만 허용하는 기준을 Product/Option에 적용했다. |
 | `현재 작업` | Product 단건/목록 조회 응답에 옵션 목록을 포함하고 `ProductQueryDao`/`OptionQueryDao`를 도입했다. | Product/Option 객체 관계 변경이 조회 API 성능이나 N+1 문제에 영향을 주지 않도록 SQL 읽기 모델을 분리했다. |
+| `현재 작업` | 조회 UseCase 구현체와 query DAO를 각 도메인의 `query` 패키지로 이동했다. | command 서비스가 query 객체를 사용하지 않도록 패키지 경계를 분리했다. |
 
 ## 완료된 문제 해결
 
@@ -103,12 +106,12 @@ Mockito `verify(times/never)`를 사용한다.
 
 | 객체 | 계약 단위 테스트 | 서비스/API 테스트 | 구조 상태 | 문제 상태 |
 | --- | --- | --- | --- | --- |
-| `Category` | 완료: `CategoryContractTest` | 완료: `CategoryServiceTest`, `CategoryApiTest` | 완료: controller, domain, service, usecase 패키지 분리 | 삭제 정책 정의 완료: Product와 무관하게 삭제하고 누락된 Category는 `미분류 카테고리`로 표시한다. |
-| `Product` | 완료: `ProductContractTest` | 완료: `ProductUseCaseServiceTest`, 관리자 상품 미분류 API 테스트, 주문 재고 동시성 서비스 테스트 | 진행 중: Product 패키지와 UseCase 서비스가 존재한다. | Wish 관련 삭제 정책과 주문 재고 동시성은 완료. Order는 Product id 값만 보관하므로 Product 삭제와 주문 이력은 분리됐다. |
+| `Category` | 완료: `CategoryContractTest` | 완료: `CategoryServiceTest`, `CategoryApiTest` | 완료: controller, domain, query, service, usecase 패키지 분리 | 삭제 정책 정의 완료: Product와 무관하게 삭제하고 누락된 Category는 `미분류 카테고리`로 표시한다. |
+| `Product` | 완료: `ProductContractTest` | 완료: `ProductUseCaseServiceTest`, 관리자 상품 미분류 API 테스트, 주문 재고 동시성 서비스 테스트 | 진행 중: Product 패키지와 UseCase 서비스가 존재하고 조회 구현은 query 패키지에 있다. | Wish 관련 삭제 정책과 주문 재고 동시성은 완료. Order는 Product id 값만 보관하므로 Product 삭제와 주문 이력은 분리됐다. |
 | `Option` | 부분 완료: product/option 서비스 테스트로 일부 커버하지만 독립 계약 테스트는 아직 없다. | 완료: `ProductOptionUseCaseServiceTest`, `OptionApiTest`, `OrderServiceTest`, `OrderConcurrencyServiceTest` | 진행 중: Option 동작은 Product usecase/service 흐름 아래에 있고, 생성/삭제/재고 차감은 Product 루트 메서드로 수행한다. `OptionRepository`는 제거했고 조회 API는 `OptionQueryDao`가 담당한다. | Order는 Option id와 스냅샷만 보관하므로 주문된 Option도 Product Aggregate 규칙상 삭제 가능하면 삭제된다. 단, Product에는 항상 최소 1개의 옵션이 남아야 한다. |
 | `Member` | 미완료: 포인트와 식별성 규칙 계약 테스트가 필요하다. | 완료: 회원가입/로그인 API, 회원가입 서비스 테스트, 주문 포인트 동시성 서비스 테스트 | 부분 완료: 회원가입 UseCase 서비스는 존재하고 로그인/관리자 회원 로직은 아직 컨트롤러에 남아 있다. | 중복 회원가입과 주문 포인트 차감 동시성은 해결됐고, Wish/Order가 있을 때의 Member 삭제 정책이 더 필요하다. |
-| `Wish` | 완료: `WishContractTest` | 완료: `WishServiceTest`, `WishApiTest` | 완료: controller, domain, service, usecase 패키지 분리, 추가/목록/삭제 UseCase 서비스 추출, `Member`/`Product` 직접 객체 참조 제거, 목록 응답용 `wish`-`product` 조인 쿼리 분리 | 현재 API 정책은 정의됨: 인증 필요, 중복 추가는 기존 Wish 반환, 삭제는 소유자만 가능. Product가 없는 Wish는 목록에서 미노출한다. 동시 중복 추가와 Product/Member 삭제 정책은 남아 있다. |
-| `Order` | 부분 완료: `OrderContractTest`, `CreateOrderServiceTest`, `KakaoOrderMessageListenerTest` | 부분 완료: `OrderServiceTest`, `OrderConcurrencyServiceTest` | 완료: controller, domain, service, usecase 패키지 분리. 생성 UseCase 서비스와 목록 UseCase 서비스가 존재하고, 목록 조회는 `JdbcTemplate` query DAO로 `orders` 스냅샷을 읽는다. Order는 `productId`, `optionId`, `memberId` 값과 주문 당시 스냅샷을 보관한다. | 재고/포인트 동시성, 주문 목록 스냅샷, Kakao afterCommit async, 주문 후 Wish 유지 정책은 해결됐다. |
+| `Wish` | 완료: `WishContractTest` | 완료: `WishServiceTest`, `WishApiTest` | 완료: controller, domain, query, service, usecase 패키지 분리, 추가/목록/삭제 UseCase 서비스 추출, `Member`/`Product` 직접 객체 참조 제거, 목록 응답용 `wish`-`product` 조인 쿼리 분리 | 현재 API 정책은 정의됨: 인증 필요, 중복 추가는 기존 Wish 반환, 삭제는 소유자만 가능. Product가 없는 Wish는 목록에서 미노출한다. 동시 중복 추가와 Product/Member 삭제 정책은 남아 있다. |
+| `Order` | 부분 완료: `OrderContractTest`, `CreateOrderServiceTest`, `KakaoOrderMessageListenerTest` | 부분 완료: `OrderServiceTest`, `OrderConcurrencyServiceTest` | 완료: controller, domain, query, service, usecase 패키지 분리. 생성 UseCase 서비스와 목록 UseCase 서비스가 존재하고, 목록 조회는 `JdbcTemplate` query DAO로 `orders` 스냅샷을 읽는다. Order는 `productId`, `optionId`, `memberId` 값과 주문 당시 스냅샷을 보관한다. | 재고/포인트 동시성, 주문 목록 스냅샷, Kakao afterCommit async, 주문 후 Wish 유지 정책은 해결됐다. |
 
 ## 객체별 리팩터링 TODO
 
@@ -146,6 +149,7 @@ Mockito `verify(times/never)`를 사용한다.
 - [x] Category 삭제 정책 API 테스트를 추가한다.
 - [x] 생성/목록/수정/삭제 UseCase 서비스를 추출한다.
 - [x] Category controller, domain, service, usecase 패키지를 분리한다.
+- [x] Category 조회 UseCase 구현체를 query 패키지로 분리한다.
 - [x] Category 서비스의 메서드 단위 트랜잭션 경계를 확인한다.
 - [x] Product 없이 존재할 수 있는 `Category` Aggregate root를 확인한다.
 - [ ] 중복 Category 이름과 동시 수정/삭제 동작을 검토한다.
@@ -159,6 +163,7 @@ Mockito `verify(times/never)`를 사용한다.
 - [x] Product와 Category Aggregate를 분리한다.
 - [x] Product 조회 응답에 옵션 목록을 포함한다.
 - [x] Product 조회 API를 `JdbcTemplate` query 객체로 분리한다.
+- [x] Product/Option 조회 UseCase 구현체와 query 객체를 query 패키지로 분리한다.
 - [ ] 관리자 Product UseCase 구현을 검토한다.
 - [ ] 관리자 Product 흐름의 메서드 단위 트랜잭션 경계를 확인한다.
 - [x] Wish가 Product를 참조할 때 삭제 정책을 정의한다: Product 삭제 시 Wish는 수정/삭제하지 않는다.
@@ -203,6 +208,7 @@ Mockito `verify(times/never)`를 사용한다.
 - [x] 서비스 추출 후 메서드 단위 트랜잭션 경계를 추가한다.
 - [x] `Wish`를 별도 Aggregate root로 보고 `Member`/`Product` 직접 객체 참조를 제거한다.
 - [x] 목록 응답 조립은 `JdbcTemplate` 기반 query 객체에서 `wish`와 `product`를 inner join해서 처리한다.
+- [x] Wish 조회 UseCase 구현체와 query 객체를 query 패키지로 분리한다.
 - [x] Wish row는 있지만 Product row가 없으면 목록에 노출하지 않는다.
 - [x] Product 삭제 시 Wish는 수정/삭제하지 않고 그대로 둔다.
 - [x] 주문 생성 시 Wish는 수정/삭제하지 않고 그대로 둔다.
@@ -220,6 +226,7 @@ Mockito `verify(times/never)`를 사용한다.
 - [ ] 주문 이력 API 테스트를 추가한다.
 - [x] 컨트롤러의 주문 목록 로직을 `GetOrdersUseCase`로 추출한다.
 - [x] Order controller, domain, service, usecase 패키지를 분리한다.
+- [x] Order 조회 UseCase 구현체와 query 객체를 query 패키지로 분리한다.
 - [x] `Order`를 불변 이력 Aggregate root로 보고 Product/Option/Member 직접 객체 참조를 제거한다.
 - [x] Order 목록과 Kakao 메시지에 필요한 상품명, 옵션명, 단가, 이미지 URL을 주문 당시 스냅샷으로 보관한다.
 - [x] 생성 서비스 추출 후 메서드 단위 트랜잭션 경계를 추가한다.

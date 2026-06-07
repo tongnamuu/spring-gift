@@ -1,4 +1,4 @@
-package gift.wish.service;
+package gift.wish.query;
 
 import gift.wish.controller.WishResponse;
 import org.springframework.data.domain.Page;

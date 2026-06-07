@@ -1,4 +1,4 @@
-package gift.product.service;
+package gift.product.query;
 
 import gift.product.dto.OptionResponse;
 import gift.product.dto.ProductResponse;

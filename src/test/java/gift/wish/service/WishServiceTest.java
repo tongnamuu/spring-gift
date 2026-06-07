@@ -11,6 +11,7 @@ import gift.wish.controller.WishRequest;
 import gift.wish.controller.WishResponse;
 import gift.wish.domain.Wish;
 import gift.wish.domain.WishRepository;
+import gift.wish.query.GetWishesService;
 import gift.wish.usecase.AddWishResult;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

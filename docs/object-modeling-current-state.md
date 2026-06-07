@@ -9,17 +9,18 @@ Product/Option, Wish, Member 회원가입, Order 생성/목록은 UseCase 서비
 ```text
 gift
 |-- auth       JWT, Kakao OAuth 로그인, 인증 사용자 해석
-|-- category   카테고리 controller/domain/service/usecase
-|-- product    상품/옵션 controller/entity/dto/repository/service/usecase, 관리자 상품 화면
+|-- category   카테고리 controller/domain/query/service/usecase
+|-- product    상품/옵션 controller/entity/dto/query/repository/service/usecase, 관리자 상품 화면
 |-- member     회원 API, 관리자 회원 화면, 회원 엔티티/DTO/리포지토리
-|-- wish       위시 controller/domain/service/usecase, 목록 query DAO
-|-- order      주문 controller/domain/service/usecase, 목록 query DAO, Kakao 메시지 전송
+|-- wish       위시 controller/domain/query/service/usecase
+|-- order      주문 controller/domain/query/service/usecase, Kakao 메시지 전송
 ```
 
 현재 레이어 흐름은 대부분 다음 형태이다.
 
 ```text
 Controller -> UseCase Service -> Repository -> Entity
+Controller -> Query UseCase Service -> Query DAO / Repository
 Controller -> Request DTO / Response DTO
 Controller or Service -> Validator / External Client
 ```
@@ -303,7 +304,7 @@ UseCase 연결은 객체별로 진행 중이다. 현재 Category, Product 일부
 3. `CategoryRepository`로 카테고리를 조회한다.
 4. `Product`를 생성하거나 `update`로 변경한다.
 5. `ProductRepository`에 저장한다.
-6. 상품 단건/목록 조회 응답은 `ProductQueryDao`가 `product`와 `options`를 명시적 SQL로 조회해 옵션 목록을 포함한 `ProductResponse`로 만든다.
+6. 상품 단건/목록 조회 응답은 `product.query.ProductQueryDao`가 `product`와 `options`를 명시적 SQL로 조회해 옵션 목록을 포함한 `ProductResponse`로 만든다.
 
 관리자 상품 화면도 같은 엔티티와 리포지토리를 사용하지만, API DTO 대신 폼 파라미터와
 Thymeleaf 모델을 직접 다룬다.
@@ -315,7 +316,7 @@ Thymeleaf 모델을 직접 다룬다.
 3. `CreateOptionService`는 Product 루트를 조회하고 `Product.addOption`으로 옵션을 추가한 뒤 `ProductRepository.save(product)`로 저장한다.
 4. `DeleteOptionService`는 Product 루트를 조회하고 `Product.removeOption(optionId)`로 삭제 규칙을 적용한 뒤 `ProductRepository.save(product)`로 저장한다.
 5. 상품은 최소 1개의 옵션을 가져야 하므로 마지막 옵션 삭제는 `옵션이 1개인 상품은 옵션을 삭제할 수 없습니다.` 메시지로 거절한다.
-6. 옵션 목록 조회 API는 `OptionQueryDao`가 `options` 테이블을 명시적 SQL로 읽는다.
+6. 옵션 목록 조회 API는 `product.query.OptionQueryDao`가 `options` 테이블을 명시적 SQL로 읽는다.
 
 `OptionRepository`는 없다. Option은 별도 Aggregate root가 아니므로 쓰기 흐름은 Product 루트와 `ProductRepository`를 통해 수행한다.
 
@@ -332,7 +333,7 @@ Thymeleaf 모델을 직접 다룬다.
 2. `AddWishService`는 `ProductRepository`로 상품을 조회한다.
 3. 이미 같은 회원과 상품의 위시가 있으면 기존 위시를 반환한다.
 4. 새 위시는 `memberId`와 `productId`로 생성한다.
-5. `GetWishesService`는 `JdbcTemplate` 기반 query 객체로 `wish`와 `product`를 inner join해서 응답을 조립한다.
+5. `wish.query.GetWishesService`는 `JdbcTemplate` 기반 `wish.query.WishQueryDao`로 `wish`와 `product`를 inner join해서 응답을 조립한다.
 6. Product row가 없는 Wish row는 목록 응답에 노출하지 않는다.
 7. Product 삭제는 Wish row를 수정하거나 삭제하지 않는다.
 8. `RemoveWishService`는 `Wish.isOwnedBy(memberId)`로 소유권을 확인하고, 다른 회원의 위시면 403 응답으로 변환될 예외를 발생시킨다.
@@ -344,7 +345,7 @@ Thymeleaf 모델을 직접 다룬다.
 3. `Product.subtractOptionQuantity(optionId, quantity)`로 Product 루트를 통해 옵션 재고를 차감한다.
 4. `Member.deductPoint(product.price * quantity)`로 포인트를 차감한다.
 5. `Order`는 `productId`, `optionId`, `memberId` 값과 상품명, 옵션명, 단가, 이미지 URL 스냅샷으로 저장한다.
-6. `GetOrdersService`는 `JdbcTemplate` 기반 `OrderQueryDao`로 `orders` 스냅샷 컬럼을 직접 조회한다.
+6. `order.query.GetOrdersService`는 `JdbcTemplate` 기반 `order.query.OrderQueryDao`로 `orders` 스냅샷 컬럼을 직접 조회한다.
 7. 조회 API는 객체 관계 변경이 성능, join 형태, N+1 여부에 영향을 주지 않도록 JPA 엔티티 탐색 대신 명시적 SQL을 사용한다.
 8. Kakao access token이 있으면 저장된 Order 스냅샷으로 `OrderCreatedEvent`를 발행한다.
 9. `KakaoOrderMessageListener`는 `@TransactionalEventListener(AFTER_COMMIT)`와 `@Async`로 트랜잭션 성공 이후 비동기 best-effort 메시지를 전송한다.
@@ -381,7 +382,7 @@ Thymeleaf 모델을 직접 다룬다.
 - 주문 생성 후 `saveAndFlush`로 중간 flush를 강제하지 않고 트랜잭션 경계에서 변경을 반영한다.
 - 주문 재고 차감과 옵션 삭제가 동시에 같은 Product version을 읽으면 하나만 커밋되고 다른 하나는 optimistic lock failure로 실패한다.
 - 주문 목록은 Product/Option 현재 상태를 다시 조회하지 않고 `JdbcTemplate` query DAO로 Order에 저장된 생성 당시 스냅샷을 반환한다.
-- 상품 단건/목록 조회는 `ProductQueryDao`로 Product와 Option 응답을 조립하고, 옵션 목록 조회는 `OptionQueryDao`로 처리한다.
+- 상품 단건/목록 조회는 `product.query.ProductQueryDao`로 Product와 Option 응답을 조립하고, 옵션 목록 조회는 `product.query.OptionQueryDao`로 처리한다.
 - 주문 생성은 Wish를 삭제하지 않는다.
 - `Wish`의 회원/상품 참조와 `Order`의 상품/옵션/회원 참조가 원시 FK라서 객체 그래프에서 직접 탐색되지 않는다.
 - Aggregate root가 아닌 `Option`에는 별도 repository를 두지 않는다. 옵션 쓰기 규칙은 Product 루트에서 적용한다.
