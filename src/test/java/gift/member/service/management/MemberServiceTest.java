@@ -4,6 +4,7 @@ import gift.member.auth.JwtProvider;
 import gift.member.auth.TokenResponse;
 import gift.member.domain.Member;
 import gift.member.domain.MemberRepository;
+import gift.member.query.AdminMemberResponse;
 import gift.order.domain.Order;
 import gift.order.domain.OrderRepository;
 import gift.product.entity.Option;
@@ -272,7 +273,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
         Member second = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "list-2@example.com", Password.encode("password123")));
 
         List<String> emails = getMembersUseCase.execute().stream()
-            .map(Member::getEmail)
+            .map(AdminMemberResponse::email)
             .toList();
 
         assertThat(emails).contains(first.getEmail(), second.getEmail());
@@ -283,7 +284,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
         Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "get@example.com", Password.encode("password123")));
 
         assertThat(getMemberUseCase.execute(member.getId()))
-            .hasValueSatisfying(found -> assertThat(found.getEmail()).isEqualTo(member.getEmail()));
+            .hasValueSatisfying(found -> assertThat(found.email()).isEqualTo(member.getEmail()));
     }
 
     @Test
@@ -299,7 +300,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
         memberRepository.save(deleted);
 
         List<Long> ids = getMembersUseCase.execute().stream()
-            .map(Member::getId)
+            .map(AdminMemberResponse::id)
             .toList();
 
         assertThat(ids).contains(active.getId());

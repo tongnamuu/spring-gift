@@ -1,6 +1,6 @@
 package gift.member.admin;
 
-import gift.member.domain.Member;
+import gift.member.query.AdminMemberResponse;
 import gift.member.usecase.management.ChargeMemberPointUseCase;
 import gift.member.usecase.management.CreateMemberUseCase;
 import gift.member.usecase.management.DeleteMemberUseCase;
@@ -79,7 +79,7 @@ public class AdminMemberController {
 
     @GetMapping("/{id}/edit")
     public String editForm(@PathVariable Long id, Model model) {
-        final Member member = getMemberUseCase.execute(id)
+        final AdminMemberResponse member = getMemberUseCase.execute(id)
             .orElseThrow(() -> new IllegalArgumentException(MEMBER_NOT_FOUND_MESSAGE));
         model.addAttribute("member", member);
         return "member/edit";
@@ -123,7 +123,7 @@ public class AdminMemberController {
     }
 
     private void populateEditFormError(Model model, Long id, String email, String error) {
-        final Member member = getMemberUseCase.execute(id)
+        final AdminMemberResponse member = getMemberUseCase.execute(id)
             .orElseThrow(() -> new IllegalArgumentException(MEMBER_NOT_FOUND_MESSAGE));
         model.addAttribute("member", member);
         model.addAttribute("email", email);

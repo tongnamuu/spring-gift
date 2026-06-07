@@ -55,6 +55,15 @@ public class ProductQueryDao {
         return Optional.of(toResponse(products.get(0), optionsByProductId));
     }
 
+    public boolean existsById(Long id) {
+        Boolean exists = jdbcTemplate.queryForObject(
+            "select exists(select 1 from product where id = ?)",
+            Boolean.class,
+            id
+        );
+        return Boolean.TRUE.equals(exists);
+    }
+
     public Page<ProductResponse> findResponses(Pageable pageable) {
         String query = """
             select p.id, p.name, p.price, p.image_url, p.category_id

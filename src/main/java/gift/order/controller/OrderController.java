@@ -45,7 +45,7 @@ public class OrderController {
         if (member == null) {
             return ResponseEntity.status(401).build();
         }
-        var orders = getOrdersUseCase.execute(member.getId(), pageable);
+        var orders = getOrdersUseCase.execute(member.id(), pageable);
         return ResponseEntity.ok(orders);
     }
 
@@ -60,7 +60,7 @@ public class OrderController {
             return ResponseEntity.status(401).build();
         }
 
-        OrderResponse response = createOrderUseCase.execute(member.getId(), toCommand(request));
+        OrderResponse response = createOrderUseCase.execute(member.id(), toCommand(request));
 
         return ResponseEntity.created(URI.create("/api/orders/" + response.id()))
             .body(response);

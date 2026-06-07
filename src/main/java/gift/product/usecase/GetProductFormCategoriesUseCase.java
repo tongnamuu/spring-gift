@@ -1,9 +1,9 @@
 package gift.product.usecase;
 
-import gift.category.domain.Category;
+import gift.category.controller.CategoryResponse;
 
 import java.util.List;
 
 public interface GetProductFormCategoriesUseCase {
-    List<Category> execute();
+    List<CategoryResponse> execute();
 }

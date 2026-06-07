@@ -1,9 +1,9 @@
 package gift.product.usecase;
 
-import gift.product.entity.Product;
+import gift.product.dto.ProductResponse;
 
 import java.util.Optional;
 
 public interface GetAdminProductUseCase {
-    Optional<Product> execute(Long id);
+    Optional<ProductResponse> execute(Long id);
 }

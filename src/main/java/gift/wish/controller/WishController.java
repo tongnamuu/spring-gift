@@ -53,7 +53,7 @@ public class WishController {
         if (member == null) {
             return ResponseEntity.status(401).build();
         }
-        return ResponseEntity.ok(getWishesUseCase.execute(member.getId(), pageable));
+        return ResponseEntity.ok(getWishesUseCase.execute(member.id(), pageable));
     }
 
     @PostMapping
@@ -66,7 +66,7 @@ public class WishController {
             return ResponseEntity.status(401).build();
         }
 
-        AddWishResult result = addWishUseCase.execute(member.getId(), toCommand(request));
+        AddWishResult result = addWishUseCase.execute(member.id(), toCommand(request));
         if (!result.created()) {
             return ResponseEntity.ok(result.response());
         }
@@ -84,7 +84,7 @@ public class WishController {
             return ResponseEntity.status(401).build();
         }
 
-        removeWishUseCase.execute(member.getId(), id);
+        removeWishUseCase.execute(member.id(), id);
         return ResponseEntity.noContent().build();
     }
 

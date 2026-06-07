@@ -1,8 +1,10 @@
 package gift.product.service.admin;
 
+import gift.category.controller.CategoryResponse;
 import gift.category.domain.Category;
 import gift.category.domain.CategoryRepository;
 import gift.product.dto.ProductCommand;
+import gift.product.dto.ProductResponse;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
 import gift.product.usecase.CreateAdminProductUseCase;
@@ -76,7 +78,7 @@ class AdminProductUseCaseServiceTest extends AbstractMysqlServiceTest {
         ));
 
         assertThat(getAdminProductsUseCase.execute())
-            .extracting(Product::getId)
+            .extracting(ProductResponse::id)
             .contains(product.getId());
     }
 
@@ -85,7 +87,7 @@ class AdminProductUseCaseServiceTest extends AbstractMysqlServiceTest {
         Category category = saveCategory("form");
 
         assertThat(getProductFormCategoriesUseCase.execute())
-            .extracting(Category::getId)
+            .extracting(CategoryResponse::id)
             .contains(category.getId());
     }
 
@@ -102,7 +104,7 @@ class AdminProductUseCaseServiceTest extends AbstractMysqlServiceTest {
         assertThat(getAdminProductUseCase.execute(product.getId()))
             .isPresent()
             .get()
-            .extracting(Product::getName)
+            .extracting(ProductResponse::name)
             .isEqualTo(product.getName());
     }
 

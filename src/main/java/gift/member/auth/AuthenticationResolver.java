@@ -1,7 +1,6 @@
 package gift.member.auth;
 
-import gift.member.domain.Member;
-import gift.member.domain.MemberRepository;
+import gift.member.query.AuthenticationQueryDao;
 import org.springframework.stereotype.Component;
 
 /**
@@ -13,18 +12,18 @@ import org.springframework.stereotype.Component;
 @Component
 public class AuthenticationResolver {
     private final JwtProvider jwtProvider;
-    private final MemberRepository memberRepository;
+    private final AuthenticationQueryDao authenticationQueryDao;
 
-    public AuthenticationResolver(JwtProvider jwtProvider, MemberRepository memberRepository) {
+    public AuthenticationResolver(JwtProvider jwtProvider, AuthenticationQueryDao authenticationQueryDao) {
         this.jwtProvider = jwtProvider;
-        this.memberRepository = memberRepository;
+        this.authenticationQueryDao = authenticationQueryDao;
     }
 
-    public Member extractMember(String authorization) {
+    public AuthenticatedMember extractMember(String authorization) {
         try {
             final String token = authorization.replace("Bearer ", "");
             final String email = jwtProvider.getEmail(token);
-            return memberRepository.findByEmailAndDeletedFalse(email).orElse(null);
+            return authenticationQueryDao.findAuthenticatedMemberByEmail(email).orElse(null);
         } catch (Exception e) {
             return null;
         }

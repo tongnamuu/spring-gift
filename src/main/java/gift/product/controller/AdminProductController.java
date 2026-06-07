@@ -1,8 +1,8 @@
 package gift.product.controller;
 
-import gift.category.domain.Category;
+import gift.category.controller.CategoryResponse;
 import gift.product.dto.ProductCommand;
-import gift.product.entity.Product;
+import gift.product.dto.ProductResponse;
 import gift.product.usecase.CreateAdminProductUseCase;
 import gift.product.usecase.DeleteAdminProductUseCase;
 import gift.product.usecase.GetAdminProductUseCase;
@@ -82,7 +82,7 @@ public class AdminProductController {
 
     @GetMapping("/{id}/edit")
     public String editForm(@PathVariable Long id, Model model) {
-        Product product = getAdminProductUseCase.execute(id)
+        ProductResponse product = getAdminProductUseCase.execute(id)
             .orElseThrow(() -> new NoSuchElementException("상품이 존재하지 않습니다. id=" + id));
         model.addAttribute("product", product);
         model.addAttribute("categories", getProductFormCategoriesUseCase.execute());
@@ -98,7 +98,7 @@ public class AdminProductController {
         @RequestParam Long categoryId,
         Model model
     ) {
-        Product product = getAdminProductUseCase.execute(id)
+        ProductResponse product = getAdminProductUseCase.execute(id)
             .orElseThrow(() -> new NoSuchElementException("상품이 존재하지 않습니다. id=" + id));
 
         ProductNameResult productNameResult = productNameAllowingKakao(name);
@@ -135,7 +135,7 @@ public class AdminProductController {
 
     private void populateEditForm(
         Model model,
-        Product product,
+        ProductResponse product,
         List<String> errors,
         String name,
         int price,
@@ -153,7 +153,7 @@ public class AdminProductController {
 
     private Map<Long, String> categoryNames() {
         return getProductFormCategoriesUseCase.execute().stream()
-            .collect(Collectors.toMap(Category::getId, Category::getName));
+            .collect(Collectors.toMap(CategoryResponse::id, CategoryResponse::name));
     }
 
     private ProductCommand toCommand(ProductName name, int price, String imageUrl, Long categoryId) {

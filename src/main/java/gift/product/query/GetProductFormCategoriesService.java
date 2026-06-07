@@ -1,17 +1,18 @@
-package gift.category.query;
+package gift.product.query;
 
 import gift.category.controller.CategoryResponse;
-import gift.category.usecase.GetCategoriesUseCase;
+import gift.category.query.CategoryQueryDao;
+import gift.product.usecase.GetProductFormCategoriesUseCase;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
-public class GetCategoriesService implements GetCategoriesUseCase {
+public class GetProductFormCategoriesService implements GetProductFormCategoriesUseCase {
     private final CategoryQueryDao categoryQueryDao;
 
-    public GetCategoriesService(CategoryQueryDao categoryQueryDao) {
+    public GetProductFormCategoriesService(CategoryQueryDao categoryQueryDao) {
         this.categoryQueryDao = categoryQueryDao;
     }
 

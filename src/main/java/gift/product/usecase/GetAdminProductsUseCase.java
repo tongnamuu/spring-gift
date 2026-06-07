@@ -1,9 +1,9 @@
 package gift.product.usecase;
 
-import gift.product.entity.Product;
+import gift.product.dto.ProductResponse;
 
 import java.util.List;
 
 public interface GetAdminProductsUseCase {
-    List<Product> execute();
+    List<ProductResponse> execute();
 }
