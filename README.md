@@ -11,7 +11,7 @@ Spring Boot gift service for practicing production-like execution, automated ver
 - Docker Compose MySQL setup uses MySQL 8.4.9 LTS in `compose.yaml`.
 - Baseline `./gradlew test`, `./gradlew serviceTest`, and `./gradlew apiTest` currently succeed.
 - API tests now cover category deletion policy, admin product missing-category display, member registration/login behavior, and wish workflows.
-- Category, Product, Wish, member registration, and order creation now have UseCase/service extraction in progress; remaining controller logic still needs the same treatment.
+- Category, Product, Wish, member registration, and order creation/listing now have UseCase/service extraction in progress; remaining controller logic still needs the same treatment.
 - Wish is treated as a separate aggregate root and stores `memberId`/`productId` without direct `Member` or `Product` object references.
 - Product is the aggregate root for option stock changes. Order creation updates option quantity through `Product.subtractOptionQuantity(...)`, and Product/Member optimistic versions guard stock and point concurrency.
 - Order is treated as immutable history. It stores `productId`, `optionId`, and `memberId` values plus the product/option snapshot needed for order lists and Kakao messages.
@@ -59,7 +59,7 @@ Most remaining Flyway foreign keys are defined without `ON DELETE CASCADE`. In M
 | `Wish` | None currently identified. | Wish deletion is the lowest FK risk, but ownership validation must remain explicit. | Allow deletion only by the owning member. |
 | `Order` | No current delete API. | No delete behavior has been defined. | Decide whether orders are immutable history. |
 
-Related behavior gap: order creation currently has a documented intent to remove the ordered product from the buyer's wishes, but this still needs runtime verification and may leave wish rows that later block product or member deletion.
+Order creation intentionally leaves the buyer's Wish rows unchanged. A wished product can be ordered repeatedly, such as a recurring monthly purchase, so Wish is not treated as a one-time cart item.
 
 ### Order Stock And Point Concurrency
 
@@ -74,7 +74,8 @@ Current policy:
 - The service does not force `saveAndFlush`; Product and Member changes are flushed at the transaction boundary.
 - Transaction-boundary concurrency failures are handled by the common API exception handler as `409 Conflict`.
 - Kakao message sending is published as an order event and handled by an `AFTER_COMMIT` async listener through the `KakaoMessageSender` port, so it runs only after the order transaction succeeds without blocking the response path.
-- The remaining order behavior gap is ordered-product Wish cleanup.
+- Order list queries read the stored order snapshot through a `JdbcTemplate` query object, so Product/Option relationship changes do not change lookup performance or introduce N+1 behavior.
+- Ordering a product does not remove matching Wish rows.
 
 ## Member Registration And Login
 
@@ -176,8 +177,8 @@ Object-specific implementation checklist is tracked in `docs/refactoring-change-
 - `./gradlew test --tests "gift.wish.domain.WishContractTest" --rerun-tasks` - passed.
 - `./gradlew serviceTest --tests "gift.wish.service.WishServiceTest" --rerun-tasks` - passed against Docker Compose MySQL test database.
 - `./gradlew apiTest --tests "gift.wish.controller.WishApiTest" --rerun-tasks` - passed against Docker Compose MySQL test database.
-- `./gradlew serviceTest --tests "gift.order.OrderServiceTest" --rerun-tasks` - passed against Docker Compose MySQL test database for order snapshot persistence, Kakao sender success/failure behavior, multi-option product lookup, and ordered-option deletion.
-- `./gradlew serviceTest --tests "gift.order.OrderConcurrencyServiceTest" --rerun-tasks` - passed against Docker Compose MySQL test database after Product/Member transaction-boundary concurrency handling.
+- `./gradlew serviceTest --tests "gift.order.service.OrderServiceTest" --rerun-tasks` - passed against Docker Compose MySQL test database for order snapshot persistence, Kakao sender success/failure behavior, multi-option product lookup, ordered-option deletion, and Wish retention after order creation.
+- `./gradlew serviceTest --tests "gift.order.service.OrderConcurrencyServiceTest" --rerun-tasks` - passed against Docker Compose MySQL test database after Product/Member transaction-boundary concurrency handling.
 - Cucumber feature files added under `src/test/resources/features`; step definitions and runner are not configured yet.
 - `./gradlew build --rerun-tasks` - passed.
 

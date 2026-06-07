@@ -1,5 +1,6 @@
-package gift.order;
+package gift.order.domain;
 
+import gift.order.controller.OrderResponse;
 import gift.product.entity.Option;
 import gift.product.entity.Product;
 import org.junit.jupiter.api.Test;

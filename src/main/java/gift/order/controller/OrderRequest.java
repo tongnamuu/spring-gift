@@ -1,4 +1,4 @@
-package gift.order;
+package gift.order.controller;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;

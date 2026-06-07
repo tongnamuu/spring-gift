@@ -1,6 +1,8 @@
-package gift.order;
+package gift.order.controller;
 
 import gift.auth.AuthenticationResolver;
+import gift.order.usecase.CreateOrderUseCase;
+import gift.order.usecase.GetOrdersUseCase;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -18,16 +20,16 @@ import java.util.NoSuchElementException;
 @RestController
 @RequestMapping("/api/orders")
 public class OrderController {
-    private final OrderRepository orderRepository;
+    private final GetOrdersUseCase getOrdersUseCase;
     private final CreateOrderUseCase createOrderUseCase;
     private final AuthenticationResolver authenticationResolver;
 
     public OrderController(
-        OrderRepository orderRepository,
+        GetOrdersUseCase getOrdersUseCase,
         CreateOrderUseCase createOrderUseCase,
         AuthenticationResolver authenticationResolver
     ) {
-        this.orderRepository = orderRepository;
+        this.getOrdersUseCase = getOrdersUseCase;
         this.createOrderUseCase = createOrderUseCase;
         this.authenticationResolver = authenticationResolver;
     }
@@ -42,7 +44,7 @@ public class OrderController {
         if (member == null) {
             return ResponseEntity.status(401).build();
         }
-        var orders = orderRepository.findByMemberId(member.getId(), pageable).map(OrderResponse::from);
+        var orders = getOrdersUseCase.execute(member.getId(), pageable);
         return ResponseEntity.ok(orders);
     }
 

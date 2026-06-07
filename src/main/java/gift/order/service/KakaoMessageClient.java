@@ -1,4 +1,4 @@
-package gift.order;
+package gift.order.service;
 
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;

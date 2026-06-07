@@ -1,7 +1,7 @@
 # Object Modeling Current State
 
 이 문서는 현재 코드 기준의 객체 모델과 책임 배치를 정리한다. Category,
-Product/Option, Wish, Member 회원가입, Order 생성은 UseCase 서비스로 일부
+Product/Option, Wish, Member 회원가입, Order 생성/목록은 UseCase 서비스로 일부
 이동했고, 남은 흐름은 아직 컨트롤러와 리포지토리 조합이 섞여 있다.
 
 ## Package Structure
@@ -13,7 +13,7 @@ gift
 |-- product    상품/옵션 controller/entity/dto/repository/service/usecase, 관리자 상품 화면
 |-- member     회원 API, 관리자 회원 화면, 회원 엔티티/DTO/리포지토리
 |-- wish       위시 controller/domain/service/usecase, 목록 query DAO
-|-- order      주문 API, 주문 엔티티/DTO/리포지토리, Kakao 메시지 전송
+|-- order      주문 controller/domain/service/usecase, 목록 query DAO, Kakao 메시지 전송
 ```
 
 현재 레이어 흐름은 대부분 다음 형태이다.
@@ -292,7 +292,7 @@ DTO보다 엔티티와 폼 파라미터를 직접 사용한다.
 | `order` | `GetOrdersUseCase`, `CreateOrderUseCase` |
 
 UseCase 연결은 객체별로 진행 중이다. 현재 Category, Product 일부 흐름, Member
-회원가입, Wish 추가/목록/삭제, Order 생성 흐름은 UseCase 서비스를 통해 실행된다.
+회원가입, Wish 추가/목록/삭제, Order 생성/목록 흐름은 UseCase 서비스를 통해 실행된다.
 
 ## Main Object Flows
 
@@ -336,17 +336,20 @@ Thymeleaf 모델을 직접 다룬다.
 
 ### Order
 
-1. `OrderController`는 `AuthenticationResolver`로 현재 회원을 찾고 `CreateOrderUseCase`에 위임한다.
+1. `OrderController`는 `AuthenticationResolver`로 현재 회원을 찾고 주문 생성은 `CreateOrderUseCase`, 주문 목록은 `GetOrdersUseCase`에 위임한다.
 2. `CreateOrderService`는 `ProductRepository.findByOptionId`로 Product 루트를 조회한다.
 3. `Product.subtractOptionQuantity(optionId, quantity)`로 Product 루트를 통해 옵션 재고를 차감한다.
 4. `Member.deductPoint(product.price * quantity)`로 포인트를 차감한다.
 5. `Order`는 `productId`, `optionId`, `memberId` 값과 상품명, 옵션명, 단가, 이미지 URL 스냅샷으로 저장한다.
-6. Kakao access token이 있으면 저장된 Order 스냅샷으로 `OrderCreatedEvent`를 발행한다.
-7. `KakaoOrderMessageListener`는 `@TransactionalEventListener(AFTER_COMMIT)`와 `@Async`로 트랜잭션 성공 이후 비동기 best-effort 메시지를 전송한다.
-8. 실제 Kakao 전송은 외부 연동 포트인 `KakaoMessageSender`를 통해 수행하며, `KakaoMessageClient`가 이를 구현한다.
-9. 트랜잭션 경계에서 발생한 `ConcurrencyFailureException`은 공통 API 예외 처리에서 `409 Conflict`로 변환한다.
+6. `GetOrdersService`는 `JdbcTemplate` 기반 `OrderQueryDao`로 `orders` 스냅샷 컬럼을 직접 조회한다.
+7. 조회 API는 객체 관계 변경이 성능, join 형태, N+1 여부에 영향을 주지 않도록 JPA 엔티티 탐색 대신 명시적 SQL을 사용한다.
+8. Kakao access token이 있으면 저장된 Order 스냅샷으로 `OrderCreatedEvent`를 발행한다.
+9. `KakaoOrderMessageListener`는 `@TransactionalEventListener(AFTER_COMMIT)`와 `@Async`로 트랜잭션 성공 이후 비동기 best-effort 메시지를 전송한다.
+10. 실제 Kakao 전송은 외부 연동 포트인 `KakaoMessageSender`를 통해 수행하며, `KakaoMessageClient`가 이를 구현한다.
+11. 트랜잭션 경계에서 발생한 `ConcurrencyFailureException`은 공통 API 예외 처리에서 `409 Conflict`로 변환한다.
 
-주문 생성 후 위시 삭제는 아직 구현되지 않았다.
+주문 생성 후에도 Wish는 삭제하지 않는다. Wish는 반복 구매 후보를 보관하는 별도 루트이며,
+주문은 일회성 구매 이력으로 다룬다.
 
 ## Domain Rules Location
 
@@ -360,18 +363,20 @@ Thymeleaf 모델을 직접 다룬다.
 | 포인트 충전 금액 양수 | `Member.chargePoint` |
 | 포인트 차감 금액 양수, 잔액 부족 방지 | `Member.deductPoint` |
 | 위시 소유자만 삭제 가능 | `Wish.isOwnedBy`, `RemoveWishService` |
+| 주문 생성 후 Wish 유지 | `CreateOrderService`, `OrderServiceTest` |
 | 주문 금액 계산 | `CreateOrderService.execute` |
-| 주문 목록 표시 데이터 | `Order` 스냅샷 필드, `OrderResponse.from` |
+| 주문 목록 표시 데이터 | `Order` 스냅샷 필드, `OrderQueryDao` |
 | Kakao 메시지 전송 실패 무시 | `KakaoOrderMessageListener.handle`, `KakaoMessageSender` |
 | 주문 동시성 API 응답 | `GlobalExceptionHandler.handleConcurrencyFailure` |
 
 ## Current Structural Observations
 
 - 컨트롤러가 인증, 조회, 검증, 도메인 변경, 저장, 응답 변환을 함께 수행하던 구조를 객체별로 UseCase 서비스로 옮기는 중이다.
-- Category, Product 일부 흐름, Member 회원가입, Wish 추가/목록/삭제, Order 생성은 UseCase 서비스에 연결되어 있다.
+- Category, Product 일부 흐름, Member 회원가입, Wish 추가/목록/삭제, Order 생성/목록은 UseCase 서비스에 연결되어 있다.
 - `CreateOrderService.execute`에는 메서드 단위 트랜잭션 경계가 있다.
 - 주문 생성 흐름에서 Product 루트 재고 차감, Member 포인트 차감, Order 저장이 같은 트랜잭션에서 실행된다.
 - 주문 생성 후 `saveAndFlush`로 중간 flush를 강제하지 않고 트랜잭션 경계에서 변경을 반영한다.
-- 주문 목록은 Product/Option 현재 상태를 다시 조회하지 않고 Order에 저장된 생성 당시 스냅샷을 반환한다.
+- 주문 목록은 Product/Option 현재 상태를 다시 조회하지 않고 `JdbcTemplate` query DAO로 Order에 저장된 생성 당시 스냅샷을 반환한다.
+- 주문 생성은 Wish를 삭제하지 않는다.
 - `Wish`의 회원/상품 참조와 `Order`의 상품/옵션/회원 참조가 원시 FK라서 객체 그래프에서 직접 탐색되지 않는다.
 - 일부 비즈니스 규칙이 엔티티가 아니라 컨트롤러에 있다.

@@ -1,15 +1,21 @@
-package gift.order;
+package gift.order.service;
 
 import gift.category.domain.Category;
 import gift.category.domain.CategoryRepository;
 import gift.member.Member;
 import gift.member.MemberRepository;
+import gift.order.controller.OrderRequest;
+import gift.order.controller.OrderResponse;
+import gift.order.usecase.CreateOrderUseCase;
+import gift.order.usecase.GetOrdersUseCase;
 import gift.product.entity.Option;
 import gift.product.entity.Product;
 import gift.product.repository.OptionRepository;
 import gift.product.repository.ProductRepository;
 import gift.product.usecase.DeleteOptionUseCase;
 import gift.support.AbstractMysqlServiceTest;
+import gift.wish.domain.Wish;
+import gift.wish.domain.WishRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,7 +53,7 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
     private CreateOrderUseCase createOrderUseCase;
 
     @Autowired
-    private OrderRepository orderRepository;
+    private GetOrdersUseCase getOrdersUseCase;
 
     @Autowired
     private MemberRepository memberRepository;
@@ -63,6 +69,9 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
 
     @Autowired
     private DeleteOptionUseCase deleteOptionUseCase;
+
+    @Autowired
+    private WishRepository wishRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -95,8 +104,7 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
         );
         updateProductAfterOrder(product.getId(), category.getId());
 
-        OrderResponse listed = orderRepository.findByMemberId(member.getId(), Pageable.unpaged())
-            .map(OrderResponse::from)
+        OrderResponse listed = getOrdersUseCase.execute(member.getId(), Pageable.unpaged())
             .getContent()
             .get(0);
 
@@ -179,8 +187,7 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
 
         deleteOptionUseCase.execute(product.getId(), orderedOption.getId());
 
-        OrderResponse listed = orderRepository.findByMemberId(member.getId(), Pageable.unpaged())
-            .map(OrderResponse::from)
+        OrderResponse listed = getOrdersUseCase.execute(member.getId(), Pageable.unpaged())
             .getContent()
             .get(0);
         assertThat(optionRepository.existsById(orderedOption.getId())).isFalse();
@@ -191,6 +198,23 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
         assertThat(listed.optionName()).isEqualTo(ORIGINAL_OPTION_NAME);
         assertThat(listed.productName()).isEqualTo(ORIGINAL_PRODUCT_NAME);
         assertThat(listed.unitPrice()).isEqualTo(ORIGINAL_UNIT_PRICE);
+    }
+
+    @Test
+    void orderCreationLeavesWishForRecurringPurchase() {
+        Member member = saveMember();
+        Category category = saveCategory();
+        Product product = saveProduct(category);
+        Option option = optionRepository.save(new Option(product, ORIGINAL_OPTION_NAME, 10));
+        Wish wish = wishRepository.save(new Wish(member.getId(), product.getId()));
+
+        createOrderUseCase.execute(
+            member.getId(),
+            new OrderRequest(option.getId(), 1, "반복 구매 상품 주문")
+        );
+
+        assertThat(wishRepository.existsById(wish.getId())).isTrue();
+        assertThat(countWishesByMemberAndProduct(member.getId(), product.getId())).isEqualTo(1L);
     }
 
     private void assertSnapshot(OrderResponse response) {
@@ -253,6 +277,15 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
             "select count(*) from orders where member_id = ?",
             Long.class,
             memberId
+        );
+    }
+
+    private long countWishesByMemberAndProduct(Long memberId, Long productId) {
+        return jdbcTemplate.queryForObject(
+            "select count(*) from wish where member_id = ? and product_id = ?",
+            Long.class,
+            memberId,
+            productId
         );
     }
 

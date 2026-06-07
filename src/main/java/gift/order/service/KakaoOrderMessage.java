@@ -1,4 +1,6 @@
-package gift.order;
+package gift.order.service;
+
+import gift.order.domain.Order;
 
 public record KakaoOrderMessage(
     String productName,

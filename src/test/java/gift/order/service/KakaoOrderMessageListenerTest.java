@@ -1,5 +1,6 @@
-package gift.order;
+package gift.order.service;
 
+import gift.order.domain.Order;
 import org.junit.jupiter.api.Test;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.transaction.event.TransactionPhase;

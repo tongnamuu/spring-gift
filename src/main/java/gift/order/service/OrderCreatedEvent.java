@@ -1,4 +1,4 @@
-package gift.order;
+package gift.order.service;
 
 public record OrderCreatedEvent(
     String kakaoAccessToken,

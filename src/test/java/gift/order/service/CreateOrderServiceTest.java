@@ -1,7 +1,10 @@
-package gift.order;
+package gift.order.service;
 
 import gift.member.Member;
 import gift.member.MemberRepository;
+import gift.order.controller.OrderRequest;
+import gift.order.domain.Order;
+import gift.order.domain.OrderRepository;
 import gift.product.entity.Option;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;

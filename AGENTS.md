@@ -23,6 +23,8 @@ Keep code feature-oriented: controllers, repositories, DTOs, entities, and valid
 
 Before adding or changing a class, inspect the existing interface and neighboring classes in the same feature package. UseCase interfaces are intentionally small to prevent one class from accumulating many methods and responsibilities: one API action per interface, one `execute` method per interface. Implement one UseCase interface with one concrete class so each class has a narrow reason to change. Do not create a broad service class that implements multiple UseCase interfaces or mixes unrelated actions unless explicitly requested. Keep the implementation class in the owning domain package, and keep controller logic thin by delegating only to the relevant UseCase. Match the existing request/response DTOs and domain objects instead of inventing new boundary types.
 
+Read APIs should use a dedicated `JdbcTemplate` query object instead of JPA entity traversal or derived repository queries. Object and aggregate relationship changes must not change query performance, join shape, or introduce N+1 behavior. Keep write UseCases on domain objects and repositories, and keep read models explicit with SQL that returns the API response shape.
+
 ## Testing Guidelines
 
 The project uses `spring-boot-starter-test`, JUnit 5, and Kotlin test support. Organize tests into three layers by purpose:
