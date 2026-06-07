@@ -315,7 +315,7 @@ Thymeleaf 모델을 직접 다룬다.
 2. 옵션명 규칙은 `OptionNameValidator`에서 확인한다.
 3. `CreateOptionService`는 Product 루트를 조회하고 `Product.addOption`으로 옵션을 추가한 뒤 `ProductRepository.save(product)`로 저장한다.
 4. `DeleteOptionService`는 Product 루트를 조회하고 `Product.removeOption(optionId)`로 삭제 규칙을 적용한 뒤 `ProductRepository.save(product)`로 저장한다.
-5. 상품은 최소 1개의 옵션을 가져야 하므로 마지막 옵션 삭제는 `옵션이 1개인 상품은 옵션을 삭제할 수 없습니다.` 메시지로 거절한다.
+5. 상품 생성 시점에는 옵션 없이 존재할 수 있다. 다만 옵션이 등록된 뒤에는 마지막 옵션 삭제를 `옵션이 1개인 상품은 옵션을 삭제할 수 없습니다.` 메시지로 거절한다.
 6. 옵션 목록 조회 API는 `product.query.OptionQueryDao`가 `options` 테이블을 명시적 SQL로 읽는다.
 
 `OptionRepository`는 없다. Option은 별도 Aggregate root가 아니므로 쓰기 흐름은 Product 루트와 `ProductRepository`를 통해 수행한다.
@@ -361,8 +361,8 @@ Thymeleaf 모델을 직접 다룬다.
 | --- | --- |
 | 상품명 길이, 허용 문자, 일반 API의 `카카오` 포함 제한 | `ProductNameValidator`, 컨트롤러 호출 |
 | 옵션명 길이와 허용 문자 | `OptionNameValidator`, `CreateOptionService` |
-| 상품별 옵션명 중복 금지 | `Product.addOption` |
-| 상품 옵션 최소 1개 유지 | `Product.removeOption` |
+| 상품별 옵션명 중복 금지, 다른 상품 간 같은 옵션명 허용 | `Product.addOption` |
+| 옵션 등록 후 마지막 옵션 삭제 금지, 상품 생성 시 옵션 없음 허용 | `Product.removeOption`, `ProductContractTest` |
 | 재고 초과 차감 금지 | `Option.subtractQuantity` |
 | 포인트 충전 금액 양수 | `Member.chargePoint` |
 | 포인트 차감 금액 양수, 잔액 부족 방지 | `Member.deductPoint` |

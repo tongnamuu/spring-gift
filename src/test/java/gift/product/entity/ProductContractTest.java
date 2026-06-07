@@ -25,6 +25,13 @@ class ProductContractTest {
     }
 
     @Test
+    void productCanBeCreatedWithoutOptionsBeforeOptionsAreRegistered() {
+        Product product = product("옵션 등록 전 상품");
+
+        assertThat(product.getOptions()).isEmpty();
+    }
+
+    @Test
     void updateChangesProductAttributes() {
         Product product = product("기존 상품");
 

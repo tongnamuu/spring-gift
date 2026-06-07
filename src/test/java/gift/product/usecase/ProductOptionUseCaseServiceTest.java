@@ -7,11 +7,14 @@ import gift.product.dto.OptionResponse;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
 import gift.support.AbstractMysqlServiceTest;
+import jakarta.persistence.OptimisticLockException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
@@ -109,6 +112,21 @@ class ProductOptionUseCaseServiceTest extends AbstractMysqlServiceTest {
     }
 
     @Test
+    void concurrentDuplicateOptionNamesCreateOnlyOneOption() throws Exception {
+        Product product = saveProduct(TEST_PRODUCT_PREFIX + "cdup");
+        OptionRequest request = new OptionRequest(TEST_OPTION_PREFIX + "concurrent-duplicate", 10);
+        long initialVersion = findProductVersion(product.getId());
+
+        List<CreateOptionResult> results = createOptionsConcurrently(product.getId(), request, 2);
+
+        assertThat(createSuccessCount(results)).isEqualTo(1L);
+        assertThat(createFailures(results)).hasSize(1)
+            .allSatisfy(this::assertOptimisticLockFailure);
+        assertThat(countOptionsByProductAndName(product.getId(), request.name())).isEqualTo(1L);
+        assertThat(findProductVersion(product.getId())).isEqualTo(initialVersion + 1);
+    }
+
+    @Test
     void deleteOptionRemovesOptionWhenMoreThanOneOptionExists() {
         Product product = saveProduct(TEST_PRODUCT_PREFIX + "delete");
         OptionResponse first = saveOption(product, TEST_OPTION_PREFIX + "delete-first", 10);
@@ -167,6 +185,46 @@ class ProductOptionUseCaseServiceTest extends AbstractMysqlServiceTest {
         return createOptionUseCase.execute(product.getId(), new OptionRequest(name, quantity));
     }
 
+    private List<CreateOptionResult> createOptionsConcurrently(
+        Long productId,
+        OptionRequest request,
+        int requestCount
+    ) throws Exception {
+        ExecutorService executorService = Executors.newFixedThreadPool(requestCount);
+        CountDownLatch ready = new CountDownLatch(requestCount);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<CreateOptionResult>> futures = java.util.stream.IntStream.range(0, requestCount)
+                .mapToObj(ignored -> executorService.submit(() -> createOptionAfterStart(productId, request, ready, start)))
+                .toList();
+
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            return futures.stream()
+                .map(this::getCreateResult)
+                .toList();
+        } finally {
+            executorService.shutdownNow();
+        }
+    }
+
+    private CreateOptionResult createOptionAfterStart(
+        Long productId,
+        OptionRequest request,
+        CountDownLatch ready,
+        CountDownLatch start
+    ) {
+        ready.countDown();
+        await(start);
+        try {
+            OptionResponse response = createOptionUseCase.execute(productId, request);
+            return CreateOptionResult.success(response);
+        } catch (Throwable failure) {
+            return CreateOptionResult.failure(failure);
+        }
+    }
+
     private List<DeleteOptionResult> deleteOptionsConcurrently(Long productId, List<Long> optionIds) throws Exception {
         ExecutorService executorService = Executors.newFixedThreadPool(optionIds.size());
         CountDownLatch ready = new CountDownLatch(optionIds.size());
@@ -212,6 +270,14 @@ class ProductOptionUseCaseServiceTest extends AbstractMysqlServiceTest {
         }
     }
 
+    private CreateOptionResult getCreateResult(Future<CreateOptionResult> future) {
+        try {
+            return future.get();
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to collect concurrent option create result.", e);
+        }
+    }
+
     private DeleteOptionResult getResult(Future<DeleteOptionResult> future) {
         try {
             return future.get();
@@ -233,6 +299,26 @@ class ProductOptionUseCaseServiceTest extends AbstractMysqlServiceTest {
             .toList();
     }
 
+    private long createSuccessCount(List<CreateOptionResult> results) {
+        return results.stream()
+            .filter(CreateOptionResult::succeeded)
+            .count();
+    }
+
+    private List<Throwable> createFailures(List<CreateOptionResult> results) {
+        return results.stream()
+            .map(CreateOptionResult::failure)
+            .filter(failure -> failure != null)
+            .toList();
+    }
+
+    private void assertOptimisticLockFailure(Throwable failure) {
+        assertThat(containsCause(failure, OptimisticLockingFailureException.class)
+            || containsCause(failure, OptimisticLockException.class)
+            || containsProductVersionLockFailure(failure))
+            .isTrue();
+    }
+
     private void assertDeleteFailure(Throwable failure) {
         assertThat(failure).isInstanceOfAny(
             IllegalArgumentException.class,
@@ -240,11 +326,57 @@ class ProductOptionUseCaseServiceTest extends AbstractMysqlServiceTest {
         );
     }
 
+    private boolean containsCause(Throwable failure, Class<? extends Throwable> type) {
+        Throwable current = failure;
+        while (current != null) {
+            if (type.isInstance(current)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private boolean containsProductVersionLockFailure(Throwable failure) {
+        Throwable current = failure;
+        while (current != null) {
+            if (current instanceof CannotAcquireLockException && isProductVersionUpdateFailure(current)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private boolean isProductVersionUpdateFailure(Throwable failure) {
+        String message = failure.getMessage();
+        return message != null
+            && message.contains("update product")
+            && message.contains("version=?");
+    }
+
     private long countOptionsByProduct(Long productId) {
         return jdbcTemplate.queryForObject(
             "select count(*) from options where product_id = ?",
             Long.class,
             productId
+        );
+    }
+
+    private long findProductVersion(Long productId) {
+        return jdbcTemplate.queryForObject(
+            "select version from product where id = ?",
+            Long.class,
+            productId
+        );
+    }
+
+    private long countOptionsByProductAndName(Long productId, String name) {
+        return jdbcTemplate.queryForObject(
+            "select count(*) from options where product_id = ? and name = ?",
+            Long.class,
+            productId,
+            name
         );
     }
 
@@ -271,6 +403,16 @@ class ProductOptionUseCaseServiceTest extends AbstractMysqlServiceTest {
         );
         jdbcTemplate.update("delete from product where name like ?", TEST_PRODUCT_PREFIX + "%");
         jdbcTemplate.update("delete from category where name like ?", TEST_CATEGORY_PREFIX + "%");
+    }
+
+    private record CreateOptionResult(boolean succeeded, OptionResponse response, Throwable failure) {
+        private static CreateOptionResult success(OptionResponse response) {
+            return new CreateOptionResult(true, response, null);
+        }
+
+        private static CreateOptionResult failure(Throwable failure) {
+            return new CreateOptionResult(false, null, failure);
+        }
     }
 
     private record DeleteOptionResult(boolean succeeded, Throwable failure) {
