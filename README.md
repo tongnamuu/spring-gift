@@ -15,6 +15,7 @@ Spring Boot gift service for practicing production-like execution, automated ver
 - Member code is grouped under `gift.member`; auth/admin/controller/domain are separated, and service/usecase classes are further grouped into `auth` and `management` workflows.
 - Member deletion is a soft delete. Deleted members remain in the database for Wish/Order FK integrity, but admin lists, member lookup, login, Kakao login, and token-based authentication ignore deleted members.
 - Deleted member emails cannot be registered again; the existing unique email constraint keeps the email reserved.
+- Authorization and permission checks were not changed by these refactoring changes; existing access behavior remains as-is.
 - Wish is treated as a separate aggregate root and stores `memberId`/`productId` without direct `Member` or `Product` object references.
 - Product is the aggregate root for option stock changes. Order creation updates option quantity through `Product.subtractOptionQuantity(...)`, and Product/Member optimistic versions guard stock and point concurrency.
 - Option is not a separate aggregate root. Option creation/deletion goes through Product, only root repositories are used for writes, and read APIs use dedicated `JdbcTemplate` query objects.

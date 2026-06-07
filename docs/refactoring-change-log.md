@@ -66,6 +66,7 @@ Mockito `verify(times/never)`를 사용한다.
 | `27425e4` | Kakao 로그인 UseCase 이름과 Kakao 인가 URI provider 역할을 정리했다. | 사용자가 Kakao로 로그인한다는 핵심 UseCase와 OAuth 보조 컴포넌트를 분리했다. |
 | `a79a46b` | 관리자 상품 화면의 목록/단건/생성/수정/삭제/폼 카테고리 조회 UseCase 서비스를 추가했다. | 관리자 상품 컨트롤러의 repository 직접 호출을 제거하고 트랜잭션 경계를 서비스로 이동했다. |
 | `이번 변경` | Member 삭제를 물리 삭제에서 소프트 삭제로 변경했다. | Wish/Order FK를 유지하면서 회원 삭제 의도를 표현하고, 삭제된 회원을 조회/로그인/인증 대상에서 제외한다. |
+| `이번 변경` | 권한 체크 범위를 명시했다. | 이번까지의 리팩터링과 정책 변경은 권한 체크 동작을 변경하지 않았고, 기존 접근 동작은 그대로 둔다. |
 
 ## 완료된 문제 해결
 
@@ -223,6 +224,7 @@ Mockito `verify(times/never)`를 사용한다.
 - [x] Wish, Order, Point, Kakao access token 기준으로 `Member` Aggregate root 경계를 확인한다.
 - [x] Wish 또는 주문 이력이 있는 Member 삭제 정책을 정의한다: 물리 삭제하지 않고 `deleted=true`로 표시한다.
 - [x] 삭제된 Member는 관리자 목록/단건 조회, 일반 로그인, Kakao 로그인, 토큰 인증에서 제외한다.
+- [x] 이번까지의 리팩터링/정책 변경에서는 권한 체크 동작을 변경하지 않았다는 범위를 명시한다.
 - [ ] 동시 포인트 충전/차감과 Member 삭제 동작을 검토한다.
 
 ### Wish
