@@ -84,6 +84,16 @@ public class Product {
         recordUpdated();
     }
 
+    public void removeOption(Long optionId) {
+        Option option = findOption(optionId);
+        if (options.size() <= 1) {
+            throw new IllegalArgumentException("옵션이 1개인 상품은 옵션을 삭제할 수 없습니다.");
+        }
+
+        options.remove(option);
+        recordUpdated();
+    }
+
     public Option subtractOptionQuantity(Long optionId, int amount) {
         Option option = findOption(optionId);
         option.subtractQuantity(amount);

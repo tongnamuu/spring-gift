@@ -8,10 +8,11 @@ import gift.order.controller.OrderRequest;
 import gift.order.controller.OrderResponse;
 import gift.order.usecase.CreateOrderUseCase;
 import gift.order.usecase.GetOrdersUseCase;
-import gift.product.entity.Option;
+import gift.product.dto.OptionRequest;
+import gift.product.dto.OptionResponse;
 import gift.product.entity.Product;
-import gift.product.repository.OptionRepository;
 import gift.product.repository.ProductRepository;
+import gift.product.usecase.CreateOptionUseCase;
 import gift.product.usecase.DeleteOptionUseCase;
 import gift.support.AbstractMysqlServiceTest;
 import gift.wish.domain.Wish;
@@ -65,7 +66,7 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
     private ProductRepository productRepository;
 
     @Autowired
-    private OptionRepository optionRepository;
+    private CreateOptionUseCase createOptionUseCase;
 
     @Autowired
     private DeleteOptionUseCase deleteOptionUseCase;
@@ -96,11 +97,11 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
         Member member = saveMember();
         Category category = saveCategory();
         Product product = saveProduct(category);
-        Option option = optionRepository.save(new Option(product, ORIGINAL_OPTION_NAME, 10));
+        OptionResponse option = saveOption(product, ORIGINAL_OPTION_NAME, 10);
 
         OrderResponse created = createOrderUseCase.execute(
             member.getId(),
-            new OrderRequest(option.getId(), 2, "2025년 햅쌀 주문")
+            new OrderRequest(option.id(), 2, "2025년 햅쌀 주문")
         );
         updateProductAfterOrder(product.getId(), category.getId());
 
@@ -117,19 +118,19 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
         Member member = saveMember();
         Category category = saveCategory();
         Product product = saveProduct(category);
-        Option firstOption = optionRepository.save(new Option(product, "2024년 재배 햅쌀", 10));
-        Option secondOption = optionRepository.save(new Option(product, ORIGINAL_OPTION_NAME, 20));
+        OptionResponse firstOption = saveOption(product, "2024년 재배 햅쌀", 10);
+        OptionResponse secondOption = saveOption(product, ORIGINAL_OPTION_NAME, 20);
 
         OrderResponse response = createOrderUseCase.execute(
             member.getId(),
-            new OrderRequest(secondOption.getId(), 3, "두 번째 옵션 주문")
+            new OrderRequest(secondOption.id(), 3, "두 번째 옵션 주문")
         );
 
         assertThat(response.productId()).isEqualTo(product.getId());
-        assertThat(response.optionId()).isEqualTo(secondOption.getId());
+        assertThat(response.optionId()).isEqualTo(secondOption.id());
         assertThat(response.optionName()).isEqualTo(ORIGINAL_OPTION_NAME);
-        assertThat(findOptionQuantity(firstOption.getId())).isEqualTo(10);
-        assertThat(findOptionQuantity(secondOption.getId())).isEqualTo(17);
+        assertThat(findOptionQuantity(firstOption.id())).isEqualTo(10);
+        assertThat(findOptionQuantity(secondOption.id())).isEqualTo(17);
     }
 
     @Test
@@ -137,11 +138,11 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
         Member member = saveKakaoMember("success", 100000);
         Category category = saveCategory();
         Product product = saveProduct(category);
-        Option option = optionRepository.save(new Option(product, ORIGINAL_OPTION_NAME, 10));
+        OptionResponse option = saveOption(product, ORIGINAL_OPTION_NAME, 10);
 
         createOrderUseCase.execute(
             member.getId(),
-            new OrderRequest(option.getId(), 2, "성공 메시지")
+            new OrderRequest(option.id(), 2, "성공 메시지")
         );
 
         assertThat(kakaoMessageClient.awaitMessage(2000)).isTrue();
@@ -158,18 +159,18 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
         Member member = saveKakaoMember("failure", 1000);
         Category category = saveCategory();
         Product product = saveProduct(category);
-        Option option = optionRepository.save(new Option(product, ORIGINAL_OPTION_NAME, 10));
+        OptionResponse option = saveOption(product, ORIGINAL_OPTION_NAME, 10);
 
         assertThatThrownBy(() -> createOrderUseCase.execute(
             member.getId(),
-            new OrderRequest(option.getId(), 1, "실패 메시지")
+            new OrderRequest(option.id(), 1, "실패 메시지")
         )).isInstanceOf(IllegalArgumentException.class);
 
         assertThat(kakaoMessageClient.awaitMessage(300)).isFalse();
         assertThat(kakaoMessageClient.sendCount()).isZero();
         assertThat(kakaoMessageClient.sentMessages()).isEmpty();
         assertThat(countOrdersByMember(member.getId())).isZero();
-        assertThat(findOptionQuantity(option.getId())).isEqualTo(10);
+        assertThat(findOptionQuantity(option.id())).isEqualTo(10);
     }
 
     @Test
@@ -177,24 +178,24 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
         Member member = saveMember();
         Category category = saveCategory();
         Product product = saveProduct(category);
-        Option orderedOption = optionRepository.save(new Option(product, ORIGINAL_OPTION_NAME, 10));
-        Option remainingOption = optionRepository.save(new Option(product, "2026년 재배 햅쌀", 20));
+        OptionResponse orderedOption = saveOption(product, ORIGINAL_OPTION_NAME, 10);
+        OptionResponse remainingOption = saveOption(product, "2026년 재배 햅쌀", 20);
 
         OrderResponse created = createOrderUseCase.execute(
             member.getId(),
-            new OrderRequest(orderedOption.getId(), 2, "주문된 옵션 삭제 정책")
+            new OrderRequest(orderedOption.id(), 2, "주문된 옵션 삭제 정책")
         );
 
-        deleteOptionUseCase.execute(product.getId(), orderedOption.getId());
+        deleteOptionUseCase.execute(product.getId(), orderedOption.id());
 
         OrderResponse listed = getOrdersUseCase.execute(member.getId(), Pageable.unpaged())
             .getContent()
             .get(0);
-        assertThat(optionRepository.existsById(orderedOption.getId())).isFalse();
-        assertThat(optionRepository.existsById(remainingOption.getId())).isTrue();
+        assertThat(optionExists(orderedOption.id())).isFalse();
+        assertThat(optionExists(remainingOption.id())).isTrue();
         assertThat(countOrdersByMember(member.getId())).isEqualTo(1L);
-        assertThat(created.optionId()).isEqualTo(orderedOption.getId());
-        assertThat(listed.optionId()).isEqualTo(orderedOption.getId());
+        assertThat(created.optionId()).isEqualTo(orderedOption.id());
+        assertThat(listed.optionId()).isEqualTo(orderedOption.id());
         assertThat(listed.optionName()).isEqualTo(ORIGINAL_OPTION_NAME);
         assertThat(listed.productName()).isEqualTo(ORIGINAL_PRODUCT_NAME);
         assertThat(listed.unitPrice()).isEqualTo(ORIGINAL_UNIT_PRICE);
@@ -205,12 +206,12 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
         Member member = saveMember();
         Category category = saveCategory();
         Product product = saveProduct(category);
-        Option option = optionRepository.save(new Option(product, ORIGINAL_OPTION_NAME, 10));
+        OptionResponse option = saveOption(product, ORIGINAL_OPTION_NAME, 10);
         Wish wish = wishRepository.save(new Wish(member.getId(), product.getId()));
 
         createOrderUseCase.execute(
             member.getId(),
-            new OrderRequest(option.getId(), 1, "반복 구매 상품 주문")
+            new OrderRequest(option.id(), 1, "반복 구매 상품 주문")
         );
 
         assertThat(wishRepository.existsById(wish.getId())).isTrue();
@@ -257,6 +258,10 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
         ));
     }
 
+    private OptionResponse saveOption(Product product, String name, int quantity) {
+        return createOptionUseCase.execute(product.getId(), new OptionRequest(name, quantity));
+    }
+
     private void updateProductAfterOrder(Long productId, Long categoryId) {
         Product product = productRepository.findById(productId)
             .orElseThrow(() -> new NoSuchElementException("상품이 존재하지 않습니다. id=" + productId));
@@ -270,6 +275,14 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
             Integer.class,
             optionId
         );
+    }
+
+    private boolean optionExists(Long optionId) {
+        return jdbcTemplate.queryForObject(
+            "select count(*) from options where id = ?",
+            Long.class,
+            optionId
+        ) > 0;
     }
 
     private long countOrdersByMember(Long memberId) {

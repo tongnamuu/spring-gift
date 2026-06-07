@@ -7,10 +7,11 @@ import gift.member.MemberRepository;
 import gift.order.controller.OrderRequest;
 import gift.order.controller.OrderResponse;
 import gift.order.usecase.CreateOrderUseCase;
-import gift.product.entity.Option;
+import gift.product.dto.OptionRequest;
+import gift.product.dto.OptionResponse;
 import gift.product.entity.Product;
-import gift.product.repository.OptionRepository;
 import gift.product.repository.ProductRepository;
+import gift.product.usecase.CreateOptionUseCase;
 import gift.support.AbstractMysqlServiceTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,7 +50,7 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
     private ProductRepository productRepository;
 
     @Autowired
-    private OptionRepository optionRepository;
+    private CreateOptionUseCase createOptionUseCase;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -68,7 +69,7 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
     void concurrentOrdersDoNotOversellOptionStock() throws Exception {
         assertOrderServiceExists();
         List<Member> members = saveMembers("stock", 100000, REQUEST_COUNT);
-        Option option = saveOption("stock", 1000, 1);
+        OptionResponse option = saveOption("stock", 1000, 1);
 
         List<CreateOrderResult> results = createOrdersConcurrently(members, option);
         List<Throwable> failures = failures(results);
@@ -77,8 +78,8 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
         assertThat(failures).hasSize(REQUEST_COUNT - 1);
         assertThat(failures)
             .allSatisfy(this::assertOrderFailure);
-        assertThat(countOrdersByOption(option.getId())).isEqualTo(1L);
-        assertThat(findOptionQuantity(option.getId())).isZero();
+        assertThat(countOrdersByOption(option.id())).isEqualTo(1L);
+        assertThat(findOptionQuantity(option.id())).isZero();
         assertThat(sumMemberPoint(TEST_EMAIL_PREFIX + "stock-%")).isEqualTo((REQUEST_COUNT * 100000) - 1000);
     }
 
@@ -86,7 +87,7 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
     void concurrentOrdersDoNotOverspendMemberPoint() throws Exception {
         assertOrderServiceExists();
         Member member = saveMember("point", 1000);
-        List<Option> options = saveOptions("point", 1000, 1, REQUEST_COUNT);
+        List<OptionResponse> options = saveOptions("point", 1000, 1, REQUEST_COUNT);
 
         List<CreateOrderResult> results = createOrdersConcurrently(member, options);
         List<Throwable> failures = failures(results);
@@ -113,7 +114,7 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
             .isNotNull();
     }
 
-    private List<CreateOrderResult> createOrdersConcurrently(Member member, Option option, int requestCount)
+    private List<CreateOrderResult> createOrdersConcurrently(Member member, OptionResponse option, int requestCount)
         throws Exception {
         return createOrdersConcurrently(
             IntStream.range(0, requestCount)
@@ -125,7 +126,7 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
         );
     }
 
-    private List<CreateOrderResult> createOrdersConcurrently(List<Member> members, Option option)
+    private List<CreateOrderResult> createOrdersConcurrently(List<Member> members, OptionResponse option)
         throws Exception {
         return createOrdersConcurrently(
             members,
@@ -135,7 +136,7 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
         );
     }
 
-    private List<CreateOrderResult> createOrdersConcurrently(Member member, List<Option> options)
+    private List<CreateOrderResult> createOrdersConcurrently(Member member, List<OptionResponse> options)
         throws Exception {
         return createOrdersConcurrently(
             IntStream.range(0, options.size())
@@ -145,7 +146,7 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
         );
     }
 
-    private List<CreateOrderResult> createOrdersConcurrently(List<Member> members, List<Option> options)
+    private List<CreateOrderResult> createOrdersConcurrently(List<Member> members, List<OptionResponse> options)
         throws Exception {
         assertThat(options).hasSameSizeAs(members);
         ExecutorService executorService = Executors.newFixedThreadPool(members.size());
@@ -161,8 +162,8 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
                     }
                     try {
                         Member member = members.get(index);
-                        Option option = options.get(index);
-                        OrderRequest request = new OrderRequest(option.getId(), 1, "동시 주문");
+                        OptionResponse option = options.get(index);
+                        OrderRequest request = new OrderRequest(option.id(), 1, "동시 주문");
                         OrderResponse response = createOrderUseCase.execute(member.getId(), request);
                         return CreateOrderResult.ok(response);
                     } catch (RuntimeException e) {
@@ -190,7 +191,7 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
             .toList();
     }
 
-    private List<Option> saveOptions(String suffix, int productPrice, int quantity, int count) {
+    private List<OptionResponse> saveOptions(String suffix, int productPrice, int quantity, int count) {
         return IntStream.range(0, count)
             .mapToObj(index -> saveOption(suffix + "-" + index, productPrice, quantity))
             .toList();
@@ -202,20 +203,31 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
         return memberRepository.save(member);
     }
 
-    private Option saveOption(String suffix, int productPrice, int quantity) {
+    private OptionResponse saveOption(String suffix, int productPrice, int quantity) {
+        Product product = saveProduct(suffix, productPrice);
+        return saveOption(product, "기본 옵션 " + suffix, quantity);
+    }
+
+    private Product saveProduct(String suffix, int productPrice) {
         Category category = categoryRepository.save(new Category(
             TEST_CATEGORY_PREFIX + suffix,
             "#123456",
             "https://example.com/order-category.png",
             "order concurrency test category"
         ));
-        Product product = productRepository.save(new Product(
+        return productRepository.save(new Product(
             TEST_PRODUCT_PREFIX + suffix,
             productPrice,
             "https://example.com/order-product.png",
             category.getId()
         ));
-        return optionRepository.save(new Option(product, "기본 옵션 " + suffix, quantity));
+    }
+
+    private OptionResponse saveOption(Product product, String name, int quantity) {
+        return createOptionUseCase.execute(
+            product.getId(),
+            new OptionRequest(name, quantity)
+        );
     }
 
     private long successCount(List<CreateOrderResult> results) {
@@ -330,4 +342,5 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
             return new CreateOrderResult(false, null, failure);
         }
     }
+
 }

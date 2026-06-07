@@ -154,7 +154,7 @@ DB에서는 `member_id` FK만 갖고 `product_id`는 FK가 아니며, JPA 모델
 | --- | --- | --- | --- | --- |
 | `Category` | `category.id` | none | `Category.update` | 독립 테이블이고 상품 없이 생성 가능하다. |
 | `Product` | `product.id` | `categoryId`, `List<Option>` | `Product.update`, `Product.addOption`, `Product.removeOption`, `Product.subtractOptionQuantity`, `ProductNameValidator` | 상품은 `category_id not null`이고, Category 객체 대신 id 값을 보관한다. 옵션 컬렉션은 JPA 필드로 가진다. |
-| `Option` | `options.id` | `Product` | `Option.subtractQuantity`, `OptionNameValidator`, `OptionController` | 옵션은 `product_id not null`이고 상품 하위 API에서 생성/조회/삭제된다. |
+| `Option` | `options.id` | `Product` | `Product.addOption`, `Product.removeOption`, `Option.subtractQuantity`, `OptionNameValidator` | 옵션은 `product_id not null`이고 상품 하위 API에서 생성/조회/삭제된다. 쓰기 흐름은 Product 루트를 통해 실행하고, 조회 API는 JDBC query 객체를 사용한다. |
 | `Member` | `member.id` | none directly | `Member.chargePoint`, `Member.deductPoint`, `Member.updateKakaoAccessToken` | 회원은 독립 테이블이고 위시/주문은 `member_id` 원시 FK로 연결된다. |
 | `Wish` | `wish.id` | `memberId`, `productId` | `Wish.isOwnedBy`, `AddWishService`, `RemoveWishService` | 위시는 별도 테이블/루트이며 회원과 상품을 객체 참조가 아니라 id 값으로 보관한다. |
 | `Order` | `orders.id` | `productId`, `optionId`, `memberId`, 주문 스냅샷 | `CreateOrderService`, `Product.subtractOptionQuantity`, `Member.deductPoint` | 주문 생성 흐름은 옵션 재고, 회원 포인트, 주문 저장을 처리한다. 목록과 Kakao 메시지는 저장된 스냅샷을 사용한다. |
@@ -173,7 +173,7 @@ DB에서는 `member_id` FK만 갖고 `product_id`는 FK가 아니며, JPA 모델
 | Object | Java field relations | Domain/DB relations | External API integration | Current coupling facts |
 | --- | ---: | ---: | --- | --- |
 | `Category` | 0 | 1 | none | `Product.categoryId` 값에서 참조된다. |
-| `Option` | 1 | 2 | none | `Product`에 속하고 `Order`에서 참조된다. 옵션명 검증, 중복 방지, 최소 옵션 수 규칙이 `OptionController`에 있다. |
+| `Option` | 1 | 2 | none | `Product`에 속하고 `Order`에서 id 값으로 참조된다. 옵션명 검증은 서비스에서, 중복 방지와 최소 옵션 수 규칙은 Product 루트에서 수행한다. |
 | `Member` | 0 | 2 | Kakao OAuth 결과 저장, JWT 발급/해석과 연결 | `Wish`와 `Order`는 `memberId`로 회원을 참조한다. 인증 흐름에서 이메일과 Kakao token이 사용된다. |
 | `Wish` | 0 | 2 | none | `Member`와 `Product` 모두 객체 참조 없이 `memberId`, `productId` 값으로 참조한다. |
 | `Product` | 1 | 3 | none | `Option`을 객체 필드로 참조하고, `Category`와 `Wish`는 id 값 또는 DB 관계로 연결된다. |
@@ -302,19 +302,22 @@ UseCase 연결은 객체별로 진행 중이다. 현재 Category, Product 일부
 2. 상품명 규칙은 `ProductNameValidator`에서 확인한다.
 3. `CategoryRepository`로 카테고리를 조회한다.
 4. `Product`를 생성하거나 `update`로 변경한다.
-5. `ProductRepository`에 저장하고 `ProductResponse`로 변환한다.
+5. `ProductRepository`에 저장한다.
+6. 상품 단건/목록 조회 응답은 `ProductQueryDao`가 `product`와 `options`를 명시적 SQL로 조회해 옵션 목록을 포함한 `ProductResponse`로 만든다.
 
 관리자 상품 화면도 같은 엔티티와 리포지토리를 사용하지만, API DTO 대신 폼 파라미터와
 Thymeleaf 모델을 직접 다룬다.
 
 ### Option
 
-1. `OptionController`는 상품 존재 여부를 먼저 확인한다.
+1. `OptionController`는 각 동작을 `GetOptionsUseCase`, `CreateOptionUseCase`, `DeleteOptionUseCase`에 위임한다.
 2. 옵션명 규칙은 `OptionNameValidator`에서 확인한다.
-3. 같은 상품 안에서 옵션명이 중복되는지 `OptionRepository`로 확인한다.
-4. 삭제 시 해당 상품의 옵션이 1개 이하이면 삭제를 막는다.
+3. `CreateOptionService`는 Product 루트를 조회하고 `Product.addOption`으로 옵션을 추가한 뒤 `ProductRepository.save(product)`로 저장한다.
+4. `DeleteOptionService`는 Product 루트를 조회하고 `Product.removeOption(optionId)`로 삭제 규칙을 적용한 뒤 `ProductRepository.save(product)`로 저장한다.
+5. 상품은 최소 1개의 옵션을 가져야 하므로 마지막 옵션 삭제는 `옵션이 1개인 상품은 옵션을 삭제할 수 없습니다.` 메시지로 거절한다.
+6. 옵션 목록 조회 API는 `OptionQueryDao`가 `options` 테이블을 명시적 SQL로 읽는다.
 
-옵션명 중복과 최소 1개 옵션 유지 규칙은 현재 엔티티가 아니라 컨트롤러 레벨에 있다.
+`OptionRepository`는 없다. Option은 별도 Aggregate root가 아니므로 쓰기 흐름은 Product 루트와 `ProductRepository`를 통해 수행한다.
 
 ### Member and Auth
 
@@ -356,8 +359,8 @@ Thymeleaf 모델을 직접 다룬다.
 | Rule | Current location |
 | --- | --- |
 | 상품명 길이, 허용 문자, 일반 API의 `카카오` 포함 제한 | `ProductNameValidator`, 컨트롤러 호출 |
-| 옵션명 길이와 허용 문자 | `OptionNameValidator`, 컨트롤러 호출 |
-| 상품별 옵션명 중복 금지 | `Product.addOption`, `OptionRepository.existsByProductIdAndName` |
+| 옵션명 길이와 허용 문자 | `OptionNameValidator`, `CreateOptionService` |
+| 상품별 옵션명 중복 금지 | `Product.addOption` |
 | 상품 옵션 최소 1개 유지 | `Product.removeOption` |
 | 재고 초과 차감 금지 | `Option.subtractQuantity` |
 | 포인트 충전 금액 양수 | `Member.chargePoint` |
@@ -377,6 +380,7 @@ Thymeleaf 모델을 직접 다룬다.
 - 주문 생성 흐름에서 Product 루트 재고 차감, Member 포인트 차감, Order 저장이 같은 트랜잭션에서 실행된다.
 - 주문 생성 후 `saveAndFlush`로 중간 flush를 강제하지 않고 트랜잭션 경계에서 변경을 반영한다.
 - 주문 목록은 Product/Option 현재 상태를 다시 조회하지 않고 `JdbcTemplate` query DAO로 Order에 저장된 생성 당시 스냅샷을 반환한다.
+- 상품 단건/목록 조회는 `ProductQueryDao`로 Product와 Option 응답을 조립하고, 옵션 목록 조회는 `OptionQueryDao`로 처리한다.
 - 주문 생성은 Wish를 삭제하지 않는다.
 - `Wish`의 회원/상품 참조와 `Order`의 상품/옵션/회원 참조가 원시 FK라서 객체 그래프에서 직접 탐색되지 않는다.
-- 일부 비즈니스 규칙이 엔티티가 아니라 컨트롤러에 있다.
+- Aggregate root가 아닌 `Option`에는 별도 repository를 두지 않는다. 옵션 쓰기 규칙은 Product 루트에서 적용한다.

@@ -4,6 +4,7 @@ import gift.category.domain.Category;
 import gift.category.domain.CategoryRepository;
 import gift.member.Member;
 import gift.member.MemberRepository;
+import gift.product.dto.OptionRequest;
 import gift.product.dto.ProductRequest;
 import gift.product.dto.ProductResponse;
 import gift.product.entity.Product;
@@ -43,6 +44,9 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
 
     @Autowired
     private DeleteProductUseCase deleteProductUseCase;
+
+    @Autowired
+    private CreateOptionUseCase createOptionUseCase;
 
     @Autowired
     private CategoryRepository categoryRepository;
@@ -86,6 +90,7 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
         assertThat(response.price()).isEqualTo(request.price());
         assertThat(response.imageUrl()).isEqualTo(request.imageUrl());
         assertThat(response.categoryId()).isEqualTo(category.getId());
+        assertThat(response.options()).isEmpty();
 
         productRepository.flush();
 
@@ -104,6 +109,7 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
     void getProductReturnsPersistedProduct() {
         Category category = saveCategory(TEST_CATEGORY_PREFIX + "get");
         Product product = saveProduct(TEST_PRODUCT_PREFIX + "get", category.getId());
+        createOptionUseCase.execute(product.getId(), new OptionRequest("단건 옵션", 10));
 
         Optional<ProductResponse> response = getProductUseCase.execute(product.getId());
 
@@ -111,6 +117,12 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
         assertThat(response.orElseThrow().id()).isEqualTo(product.getId());
         assertThat(response.orElseThrow().name()).isEqualTo(product.getName());
         assertThat(response.orElseThrow().categoryId()).isEqualTo(product.getCategoryId());
+        assertThat(response.orElseThrow().options())
+            .singleElement()
+            .satisfies(option -> {
+                assertThat(option.name()).isEqualTo("단건 옵션");
+                assertThat(option.quantity()).isEqualTo(10);
+            });
     }
 
     @Test
@@ -118,6 +130,8 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
         Category category = saveCategory(TEST_CATEGORY_PREFIX + "list");
         Product first = saveProduct(TEST_PRODUCT_PREFIX + "list-first", category.getId());
         Product second = saveProduct(TEST_PRODUCT_PREFIX + "list-second", category.getId());
+        createOptionUseCase.execute(first.getId(), new OptionRequest("목록 첫 옵션", 10));
+        createOptionUseCase.execute(second.getId(), new OptionRequest("목록 둘 옵션", 20));
 
         Page<ProductResponse> response = getProductsUseCase.execute(PageRequest.of(0, 20));
 
@@ -127,6 +141,14 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
         assertThat(response.getContent())
             .extracting(ProductResponse::name)
             .contains(first.getName(), second.getName());
+        ProductResponse firstResponse = findProductResponse(response, first.getId());
+        ProductResponse secondResponse = findProductResponse(response, second.getId());
+        assertThat(firstResponse.options())
+            .singleElement()
+            .satisfies(option -> assertThat(option.name()).isEqualTo("목록 첫 옵션"));
+        assertThat(secondResponse.options())
+            .singleElement()
+            .satisfies(option -> assertThat(option.name()).isEqualTo("목록 둘 옵션"));
     }
 
     @Test
@@ -147,6 +169,7 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
         assertThat(response.orElseThrow().id()).isEqualTo(product.getId());
         assertThat(response.orElseThrow().name()).isEqualTo(request.name());
         assertThat(response.orElseThrow().categoryId()).isEqualTo(newCategory.getId());
+        assertThat(response.orElseThrow().options()).isEmpty();
 
         Product persisted = productRepository.findById(product.getId()).orElseThrow();
         assertThat(persisted.getName()).isEqualTo(request.name());
@@ -204,6 +227,13 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
 
     private Member saveMember(String suffix) {
         return memberRepository.save(new Member(TEST_EMAIL_PREFIX + suffix + "@example.com", "password123"));
+    }
+
+    private ProductResponse findProductResponse(Page<ProductResponse> response, Long productId) {
+        return response.getContent().stream()
+            .filter(productResponse -> productResponse.id().equals(productId))
+            .findFirst()
+            .orElseThrow();
     }
 
     private void deleteTestData() {

@@ -14,6 +14,7 @@ Spring Boot gift service for practicing production-like execution, automated ver
 - Category, Product, Wish, member registration, and order creation/listing now have UseCase/service extraction in progress; remaining controller logic still needs the same treatment.
 - Wish is treated as a separate aggregate root and stores `memberId`/`productId` without direct `Member` or `Product` object references.
 - Product is the aggregate root for option stock changes. Order creation updates option quantity through `Product.subtractOptionQuantity(...)`, and Product/Member optimistic versions guard stock and point concurrency.
+- Option is not a separate aggregate root. Option creation/deletion goes through Product, only root repositories are used for writes, and read APIs use dedicated `JdbcTemplate` query objects.
 - Order is treated as immutable history. It stores `productId`, `optionId`, and `memberId` values plus the product/option snapshot needed for order lists and Kakao messages.
 
 ## Implementation Strategy
@@ -60,6 +61,8 @@ Most remaining Flyway foreign keys are defined without `ON DELETE CASCADE`. In M
 | `Order` | No current delete API. | No delete behavior has been defined. | Decide whether orders are immutable history. |
 
 Order creation intentionally leaves the buyer's Wish rows unchanged. A wished product can be ordered repeatedly, such as a recurring monthly purchase, so Wish is not treated as a one-time cart item.
+
+Option deletion is still constrained by the Product aggregate: every product must keep at least one option. Deleting the last option returns `400 Bad Request` with `옵션이 1개인 상품은 옵션을 삭제할 수 없습니다.`.
 
 ### Order Stock And Point Concurrency
 

@@ -4,20 +4,24 @@ import gift.category.domain.Category;
 import gift.category.domain.CategoryRepository;
 import gift.product.dto.OptionRequest;
 import gift.product.dto.OptionResponse;
-import gift.product.entity.Option;
 import gift.product.entity.Product;
-import gift.product.repository.OptionRepository;
 import gift.product.repository.ProductRepository;
 import gift.support.AbstractMysqlServiceTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -43,9 +47,6 @@ class ProductOptionUseCaseServiceTest extends AbstractMysqlServiceTest {
     private ProductRepository productRepository;
 
     @Autowired
-    private OptionRepository optionRepository;
-
-    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
@@ -69,8 +70,6 @@ class ProductOptionUseCaseServiceTest extends AbstractMysqlServiceTest {
         assertThat(response.name()).isEqualTo(request.name());
         assertThat(response.quantity()).isEqualTo(request.quantity());
 
-        optionRepository.flush();
-
         Map<String, Object> persisted = jdbcTemplate.queryForMap(
             "select id, product_id, name, quantity from options where id = ?",
             response.id()
@@ -84,18 +83,18 @@ class ProductOptionUseCaseServiceTest extends AbstractMysqlServiceTest {
     @Test
     void getOptionsReturnsPersistedProductOptions() {
         Product product = saveProduct(TEST_PRODUCT_PREFIX + "list");
-        Option first = saveOption(product, TEST_OPTION_PREFIX + "list-first", 10);
-        Option second = saveOption(product, TEST_OPTION_PREFIX + "list-second", 20);
+        OptionResponse first = saveOption(product, TEST_OPTION_PREFIX + "list-first", 10);
+        OptionResponse second = saveOption(product, TEST_OPTION_PREFIX + "list-second", 20);
 
         Optional<List<OptionResponse>> response = getOptionsUseCase.execute(product.getId());
 
         assertThat(response).isPresent();
         assertThat(response.orElseThrow())
             .extracting(OptionResponse::id)
-            .contains(first.getId(), second.getId());
+            .contains(first.id(), second.id());
         assertThat(response.orElseThrow())
             .extracting(OptionResponse::name)
-            .contains(first.getName(), second.getName());
+            .contains(first.name(), second.name());
     }
 
     @Test
@@ -112,24 +111,41 @@ class ProductOptionUseCaseServiceTest extends AbstractMysqlServiceTest {
     @Test
     void deleteOptionRemovesOptionWhenMoreThanOneOptionExists() {
         Product product = saveProduct(TEST_PRODUCT_PREFIX + "delete");
-        Option first = saveOption(product, TEST_OPTION_PREFIX + "delete-first", 10);
-        Option second = saveOption(product, TEST_OPTION_PREFIX + "delete-second", 20);
+        OptionResponse first = saveOption(product, TEST_OPTION_PREFIX + "delete-first", 10);
+        OptionResponse second = saveOption(product, TEST_OPTION_PREFIX + "delete-second", 20);
 
-        deleteOptionUseCase.execute(product.getId(), first.getId());
+        deleteOptionUseCase.execute(product.getId(), first.id());
 
-        assertThat(optionRepository.existsById(first.getId())).isFalse();
-        assertThat(optionRepository.existsById(second.getId())).isTrue();
+        assertThat(optionExists(first.id())).isFalse();
+        assertThat(optionExists(second.id())).isTrue();
     }
 
     @Test
     void deleteOptionRejectsRemovingLastOption() {
         Product product = saveProduct(TEST_PRODUCT_PREFIX + "last");
-        Option option = saveOption(product, TEST_OPTION_PREFIX + "last", 10);
+        OptionResponse option = saveOption(product, TEST_OPTION_PREFIX + "last", 10);
 
-        assertThatThrownBy(() -> deleteOptionUseCase.execute(product.getId(), option.getId()))
+        assertThatThrownBy(() -> deleteOptionUseCase.execute(product.getId(), option.id()))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("옵션이 1개인 상품은 옵션을 삭제할 수 없습니다.");
-        assertThat(optionRepository.existsById(option.getId())).isTrue();
+        assertThat(optionExists(option.id())).isTrue();
+    }
+
+    @Test
+    void concurrentOptionDeletesDoNotRemoveEveryOption() throws Exception {
+        Product product = saveProduct(TEST_PRODUCT_PREFIX + "c-del");
+        OptionResponse first = saveOption(product, TEST_OPTION_PREFIX + "concurrent-first", 10);
+        OptionResponse second = saveOption(product, TEST_OPTION_PREFIX + "concurrent-second", 20);
+
+        List<DeleteOptionResult> results = deleteOptionsConcurrently(
+            product.getId(),
+            List.of(first.id(), second.id())
+        );
+
+        assertThat(successCount(results)).isEqualTo(1L);
+        assertThat(failures(results)).hasSize(1)
+            .allSatisfy(this::assertDeleteFailure);
+        assertThat(countOptionsByProduct(product.getId())).isEqualTo(1L);
     }
 
     private Product saveProduct(String name) {
@@ -147,8 +163,97 @@ class ProductOptionUseCaseServiceTest extends AbstractMysqlServiceTest {
         ));
     }
 
-    private Option saveOption(Product product, String name, int quantity) {
-        return optionRepository.save(new Option(product, name, quantity));
+    private OptionResponse saveOption(Product product, String name, int quantity) {
+        return createOptionUseCase.execute(product.getId(), new OptionRequest(name, quantity));
+    }
+
+    private List<DeleteOptionResult> deleteOptionsConcurrently(Long productId, List<Long> optionIds) throws Exception {
+        ExecutorService executorService = Executors.newFixedThreadPool(optionIds.size());
+        CountDownLatch ready = new CountDownLatch(optionIds.size());
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<DeleteOptionResult>> futures = optionIds.stream()
+                .map(optionId -> executorService.submit(() -> deleteOptionAfterStart(productId, optionId, ready, start)))
+                .toList();
+
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            return futures.stream()
+                .map(this::getResult)
+                .toList();
+        } finally {
+            executorService.shutdownNow();
+        }
+    }
+
+    private DeleteOptionResult deleteOptionAfterStart(
+        Long productId,
+        Long optionId,
+        CountDownLatch ready,
+        CountDownLatch start
+    ) {
+        ready.countDown();
+        await(start);
+        try {
+            deleteOptionUseCase.execute(productId, optionId);
+            return DeleteOptionResult.success();
+        } catch (Throwable failure) {
+            return DeleteOptionResult.failure(failure);
+        }
+    }
+
+    private void await(CountDownLatch start) {
+        try {
+            start.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for concurrent option delete.", e);
+        }
+    }
+
+    private DeleteOptionResult getResult(Future<DeleteOptionResult> future) {
+        try {
+            return future.get();
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to collect concurrent option delete result.", e);
+        }
+    }
+
+    private long successCount(List<DeleteOptionResult> results) {
+        return results.stream()
+            .filter(DeleteOptionResult::succeeded)
+            .count();
+    }
+
+    private List<Throwable> failures(List<DeleteOptionResult> results) {
+        return results.stream()
+            .map(DeleteOptionResult::failure)
+            .filter(failure -> failure != null)
+            .toList();
+    }
+
+    private void assertDeleteFailure(Throwable failure) {
+        assertThat(failure).isInstanceOfAny(
+            IllegalArgumentException.class,
+            ConcurrencyFailureException.class
+        );
+    }
+
+    private long countOptionsByProduct(Long productId) {
+        return jdbcTemplate.queryForObject(
+            "select count(*) from options where product_id = ?",
+            Long.class,
+            productId
+        );
+    }
+
+    private boolean optionExists(Long optionId) {
+        return jdbcTemplate.queryForObject(
+            "select count(*) from options where id = ?",
+            Long.class,
+            optionId
+        ) > 0;
     }
 
     private void deleteTestData() {
@@ -166,5 +271,15 @@ class ProductOptionUseCaseServiceTest extends AbstractMysqlServiceTest {
         );
         jdbcTemplate.update("delete from product where name like ?", TEST_PRODUCT_PREFIX + "%");
         jdbcTemplate.update("delete from category where name like ?", TEST_CATEGORY_PREFIX + "%");
+    }
+
+    private record DeleteOptionResult(boolean succeeded, Throwable failure) {
+        private static DeleteOptionResult success() {
+            return new DeleteOptionResult(true, null);
+        }
+
+        private static DeleteOptionResult failure(Throwable failure) {
+            return new DeleteOptionResult(false, failure);
+        }
     }
 }

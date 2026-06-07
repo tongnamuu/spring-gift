@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This is a Spring Boot 3.5 application using Gradle Kotlin DSL and Java 21. Main code lives under `src/main/java/gift`, organized by feature package: `product`, `category`, `option`, `member`, `wish`, `order`, and `auth`. Kotlin source roots also exist at `src/main/kotlin/gift`. Thymeleaf admin views are in `src/main/resources/templates/{member,product}`, static assets belong in `src/main/resources/static`, and Flyway migrations are in `src/main/resources/db/migration`. Tests should mirror the package structure under `src/test/java/gift` or `src/test/kotlin/gift`.
+This is a Spring Boot 3.5 application using Gradle Kotlin DSL and Java 21. Main code lives under `src/main/java/gift`, organized by feature package: `product`, `category`, `member`, `wish`, `order`, and `auth`. Option code belongs under the Product feature because Product owns Option. Kotlin source roots also exist at `src/main/kotlin/gift`. Thymeleaf admin views are in `src/main/resources/templates/{member,product}`, static assets belong in `src/main/resources/static`, and Flyway migrations are in `src/main/resources/db/migration`. Tests should mirror the package structure under `src/test/java/gift` or `src/test/kotlin/gift`.
 
 ## Build, Test, and Development Commands
 
@@ -22,6 +22,8 @@ Keep code feature-oriented: controllers, repositories, DTOs, entities, and valid
 ## Class & UseCase Design Rules
 
 Before adding or changing a class, inspect the existing interface and neighboring classes in the same feature package. UseCase interfaces are intentionally small to prevent one class from accumulating many methods and responsibilities: one API action per interface, one `execute` method per interface. Implement one UseCase interface with one concrete class so each class has a narrow reason to change. Do not create a broad service class that implements multiple UseCase interfaces or mixes unrelated actions unless explicitly requested. Keep the implementation class in the owning domain package, and keep controller logic thin by delegating only to the relevant UseCase. Match the existing request/response DTOs and domain objects instead of inventing new boundary types.
+
+Repositories should be created only for aggregate roots. Child entities such as `Option` must be changed through the owning aggregate root (`Product`) and saved through the root repository. Do not add a child repository just to bypass aggregate rules.
 
 Read APIs should use a dedicated `JdbcTemplate` query object instead of JPA entity traversal or derived repository queries. Object and aggregate relationship changes must not change query performance, join shape, or introduce N+1 behavior. Keep write UseCases on domain objects and repositories, and keep read models explicit with SQL that returns the API response shape.
 
