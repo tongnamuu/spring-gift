@@ -49,13 +49,15 @@
 | --- | --- | --- | --- | --- |
 | `Category` | Product가 참조하는 Category는 DB FK 또는 명시적 존재 체크 때문에 삭제할 수 없다고 봤다. | Category 생명주기가 Product에 너무 강하게 묶였다. Product는 삭제된 Category id를 갖고도 목록에 표시될 수 있다. | Category 삭제는 Product와 독립적으로 허용한다. Product를 이동하거나 삭제하지 않고, Category row가 없으면 `미분류 카테고리`로 표시한다. | `c72940d`, `CategoryServiceTest`, `CategoryApiTest`, `AdminProductApiTest` |
 | `Product` | Product가 Category 객체를 직접 갖거나 직접 의존한다고 봤다. | Product -> Category 객체 결합 때문에 Aggregate 경계가 흐려졌다. | Product는 `categoryId` 값만 저장한다. Product와 Category는 서로 다른 Aggregate root이다. | `3e01cfa`, `ProductContractTest` |
+| `Wish` | Wish가 `Product` 객체를 직접 들고, 회원은 `memberId` 값으로만 참조했다. | Wish를 별도 Aggregate root로 삼을 때 Product 객체 참조가 Product Aggregate와의 경계를 흐렸다. | Wish는 `memberId`, `productId` 값만 보관한다. 상품 정보가 필요한 응답 조립은 Wish UseCase 서비스에서 `ProductRepository`로 조회한다. | `WishContractTest`, `WishServiceTest`, `WishApiTest` |
+| `Product/Wish` | Product 삭제 시 `wish.product_id -> product.id` FK가 삭제를 막았다. | Product Aggregate 삭제 정책이 Wish Aggregate에 묶였다. | Product 삭제는 Wish를 수정/삭제하지 않는다. `wish.product_id` FK를 제거하고, Product가 없는 Wish는 목록에서 미노출한다. | `V4__Remove_wish_product_foreign_key.sql`, `ProductUseCaseServiceTest`, `WishServiceTest` |
 | `Member` | 중복 회원가입은 `existsByEmail` 사전 체크로 충분하다고 봤다. | 동시 요청에서는 사전 체크 이후 저장 시점에 unique 제약 위반이 발생할 수 있다. | `member.email` unique 제약을 유지하고, 저장 단계의 중복 이메일 실패도 `400 Bad Request`로 변환한다. | `905d6b1`, `MemberServiceTest`, `MemberApiTest` |
 
 ## 진행 중인 작업
 
 | 분류 | 작업 | 현재 상태 |
 | --- | --- | --- |
-| 구조 해결 | 컨트롤러 로직을 하나의 API 동작당 하나의 UseCase 서비스로 계속 추출한다. | 로그인, 관리자 회원 기능, Wish, Order, 남은 API/admin 흐름을 검토해야 한다. |
+| 구조 해결 | 컨트롤러 로직을 하나의 API 동작당 하나의 UseCase 서비스로 계속 추출한다. | 로그인, 관리자 회원 기능, Order, 남은 API/admin 흐름을 검토해야 한다. |
 | 구조 해결 | 서비스/UseCase 메서드에 트랜잭션 경계를 추가한다. | 클래스 단위 `@Transactional`은 사용하지 않고 메서드 단위로만 선언한다. |
 | 문제 해결 | FK 삭제 오류, 런타임 오류, 정책 공백을 계속 수집한다. | 새로 발견한 동작 문제는 구조 변경보다 먼저 문제 해결 항목에 기록한다. |
 
@@ -64,10 +66,10 @@
 | 객체 | 계약 단위 테스트 | 서비스/API 테스트 | 구조 상태 | 문제 상태 |
 | --- | --- | --- | --- | --- |
 | `Category` | 완료: `CategoryContractTest` | 완료: `CategoryServiceTest`, `CategoryApiTest` | 완료: controller, domain, service, usecase 패키지 분리 | 삭제 정책 정의 완료: Product와 무관하게 삭제하고 누락된 Category는 `미분류 카테고리`로 표시한다. |
-| `Product` | 완료: `ProductContractTest` | 완료: `ProductUseCaseServiceTest`, 관리자 상품 미분류 API 테스트 | 진행 중: Product 패키지와 UseCase 서비스가 존재한다. | Wish, Option, Order가 참조할 때의 Product 삭제 정책이 더 필요하다. |
+| `Product` | 완료: `ProductContractTest` | 완료: `ProductUseCaseServiceTest`, 관리자 상품 미분류 API 테스트 | 진행 중: Product 패키지와 UseCase 서비스가 존재한다. | Wish 관련 삭제 정책은 완료: Product 삭제 시 Wish는 그대로 두고 목록에서 미노출한다. Option/Order 관련 삭제 정책은 더 필요하다. |
 | `Option` | 부분 완료: product/option 서비스 테스트로 일부 커버하지만 독립 계약 테스트는 아직 없다. | 완료: `ProductOptionUseCaseServiceTest` | 진행 중: Option 동작은 Product usecase/service 흐름 아래에 있고 `OptionRepository`는 유지 중이다. | Order가 참조하는 Option 삭제 정책이 더 필요하다. |
 | `Member` | 미완료: 포인트와 식별성 규칙 계약 테스트가 필요하다. | 완료: 회원가입/로그인 API, 회원가입 서비스 테스트 | 부분 완료: 회원가입 UseCase 서비스는 존재하고 로그인/관리자 회원 로직은 아직 컨트롤러에 남아 있다. | 중복 회원가입은 해결됐고, Wish/Order가 있을 때의 Member 삭제 정책이 더 필요하다. |
-| `Wish` | 미완료 | 미완료 | 예정 | 소유권 검증과 삭제 규칙을 테스트하고 서비스로 추출해야 한다. |
+| `Wish` | 완료: `WishContractTest` | 완료: `WishServiceTest`, `WishApiTest` | 완료: controller, domain, service, usecase 패키지 분리, 추가/목록/삭제 UseCase 서비스 추출, `Member`/`Product` 직접 객체 참조 제거, 목록 응답용 `wish`-`product` 조인 쿼리 분리 | 현재 API 정책은 정의됨: 인증 필요, 중복 추가는 기존 Wish 반환, 삭제는 소유자만 가능. Product가 없는 Wish는 목록에서 미노출한다. 동시 중복 추가와 Product/Member 삭제 정책은 남아 있다. |
 | `Order` | 미완료 | 미완료 | 예정 | 재고, 포인트, Kakao 메시지 시점, Wish 정리 동작을 검증해야 한다. |
 
 ## 객체별 리팩터링 TODO
@@ -78,14 +80,14 @@
 | `Product` | 현재 Product/Option 흐름은 완료, 관리자 Product UseCase 구현 검토 필요 | 부분 완료: Product 서비스는 메서드 단위 `@Transactional` 사용, 관리자 흐름 검토 필요 | 완료: `Product`는 Aggregate root이고 `categoryId`만 저장 | TODO: Wish, Option, Order, 누락 Category와 동시 삭제/수정 경쟁 확인 |
 | `Option` | 부분 완료: Product 패키지 아래에서 목록/생성/삭제 UseCase 존재 | 현재 Option 서비스는 완료, 이후 수정 흐름 추가 시 경계 필요 | 완료: `Option`은 별도 root가 아니라 `Product`에 소유된다 | TODO: 동시 재고 변경, 중복 Option 생성, Order 존재 중 삭제 확인 |
 | `Member` | 부분 완료: 회원가입 UseCase 존재, 로그인/관리자 생성/수정/삭제/포인트 충전 UseCase 필요 | 부분 완료: 회원가입 서비스 경계 존재, 로그인/관리자 기능 검토 필요 | TODO: Wish, Order, Point, Kakao access token을 기준으로 `Member` root 경계 확인 | 중복 회원가입은 완료, TODO: 동시 포인트 충전/차감과 Member 삭제 확인 |
-| `Wish` | TODO: 추가, 목록, 삭제 UseCase 식별 | TODO: 서비스 추출 후 메서드 단위 트랜잭션 경계 추가 | TODO: `Wish`가 독립 root인지 `Member` 소유 객체인지 결정 | TODO: 중복 Wish 추가와 소유권 기반 삭제 경쟁 확인 |
+| `Wish` | 완료: 추가, 목록, 삭제 UseCase 식별 및 서비스 구현 | 완료: Wish 서비스는 메서드 단위 `@Transactional` 사용 | 완료: `Wish`는 별도 루트이며 `memberId`, `productId` 값만 보관한다. 삭제 소유권은 `memberId`로 검증한다. | TODO: 동시 중복 Wish 추가와 소유권 기반 삭제 경쟁 확인 |
 | `Order` | TODO: 생성, 목록 UseCase 식별 | TODO: 서비스 추출 후 메서드 단위 트랜잭션 경계 추가 | TODO: `Order`를 불변 이력 Aggregate root로 볼지 확인 | TODO: 동시 재고 차감, 포인트 차감, Kakao 메시지 전송 시점, Wish 정리 확인 |
 
 ## 예정 작업
 
 | 분류 | 작업 | 이유 |
 | --- | --- | --- |
-| 문제 해결 | Wish, Option, Order가 참조하는 Product 삭제 정책 정의 | DB FK 오류가 `500`으로 새는 것을 막아야 한다. |
+| 문제 해결 | Option, Order가 참조하는 Product 삭제 정책 정의 | Wish 관련 정책은 Product 삭제 시 Wish 유지로 정리됐다. Ordered option 쪽 DB FK 오류가 `500`으로 새는 것을 막아야 한다. |
 | 문제 해결 | Order가 참조하는 Option 삭제 정책 정의 | 주문된 Option은 DB 계층 실패가 아니라 도메인 규칙으로 거절해야 한다. |
 | 문제 해결 | Wish와 주문 이력이 있는 Member 삭제 정책 정의 | Member 삭제는 Wish/Order FK 위험을 가진다. |
 | 문제 해결 | 주문 생성 후 Wish 정리 동작 검증 및 구현 | 의도는 문서화되어 있지만 실제 동작 검증이 필요하다. |
@@ -121,7 +123,8 @@
 - [x] Product와 Category Aggregate를 분리한다.
 - [ ] 관리자 Product UseCase 구현을 검토한다.
 - [ ] 관리자 Product 흐름의 메서드 단위 트랜잭션 경계를 확인한다.
-- [ ] Wish, Option, Order가 Product를 참조할 때 삭제 정책을 정의한다.
+- [x] Wish가 Product를 참조할 때 삭제 정책을 정의한다: Product 삭제 시 Wish는 수정/삭제하지 않는다.
+- [ ] Option, Order가 Product를 참조할 때 삭제 정책을 정의한다.
 - [ ] Wish, Option, Order, 누락 Category와 Product 동시 수정/삭제 경쟁을 검토한다.
 
 ### Option
@@ -148,12 +151,15 @@
 
 ### Wish
 
-- [ ] 추가/목록/삭제 UseCase를 식별한다.
-- [ ] 소유권과 삭제 규칙 계약 테스트를 추가한다.
-- [ ] 추가/목록/삭제 서비스/API 테스트를 추가한다.
-- [ ] 컨트롤러 로직을 하나의 API 동작당 하나의 UseCase 서비스로 추출한다.
-- [ ] `Wish`를 독립 Aggregate root로 볼지 `Member` 소유 객체로 볼지 결정한다.
-- [ ] 서비스 추출 후 메서드 단위 트랜잭션 경계를 추가한다.
+- [x] 추가/목록/삭제 UseCase를 식별한다.
+- [x] 소유권과 삭제 규칙 계약 테스트를 추가한다.
+- [x] 추가/목록/삭제 서비스/API 테스트를 추가한다.
+- [x] 컨트롤러 로직을 하나의 API 동작당 하나의 UseCase 서비스로 추출한다.
+- [x] 서비스 추출 후 메서드 단위 트랜잭션 경계를 추가한다.
+- [x] `Wish`를 별도 Aggregate root로 보고 `Member`/`Product` 직접 객체 참조를 제거한다.
+- [x] 목록 응답 조립은 `JdbcTemplate` 기반 query 객체에서 `wish`와 `product`를 inner join해서 처리한다.
+- [x] Wish row는 있지만 Product row가 없으면 목록에 노출하지 않는다.
+- [x] Product 삭제 시 Wish는 수정/삭제하지 않고 그대로 둔다.
 - [ ] 중복 Wish 추가와 소유권 기반 삭제 경쟁을 검토한다.
 
 ### Order
@@ -173,4 +179,3 @@
 - [ ] 각 객체의 계약 테스트를 먼저 세운 뒤 Option 재고와 Member 포인트 도메인 책임을 강화한다.
 - [ ] 최종 확인 시 `./gradlew test`와 `./gradlew build`를 실행한다.
 - [ ] AI 사용 내역과 검증 근거를 문서에 기록한다.
-

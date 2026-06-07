@@ -2,11 +2,15 @@ package gift.product.usecase;
 
 import gift.category.domain.Category;
 import gift.category.domain.CategoryRepository;
+import gift.member.Member;
+import gift.member.MemberRepository;
 import gift.product.dto.ProductRequest;
 import gift.product.dto.ProductResponse;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
 import gift.support.AbstractMysqlServiceTest;
+import gift.wish.domain.Wish;
+import gift.wish.domain.WishRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
     private static final String TEST_CATEGORY_PREFIX = "pc-";
     private static final String TEST_PRODUCT_PREFIX = "p-";
+    private static final String TEST_EMAIL_PREFIX = "product-service-";
 
     @Autowired
     private CreateProductUseCase createProductUseCase;
@@ -44,6 +49,12 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
 
     @Autowired
     private ProductRepository productRepository;
+
+    @Autowired
+    private MemberRepository memberRepository;
+
+    @Autowired
+    private WishRepository wishRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -154,6 +165,25 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
         assertThat(productRepository.existsById(product.getId())).isFalse();
     }
 
+    @Test
+    void deleteProductKeepsWishWithMissingProductReference() {
+        Category category = saveCategory(TEST_CATEGORY_PREFIX + "delete-wish");
+        Product product = saveProduct(TEST_PRODUCT_PREFIX + "delete-wish", category.getId());
+        Member member = saveMember("delete-wish");
+        Wish wish = wishRepository.save(new Wish(member.getId(), product.getId()));
+
+        deleteProductUseCase.execute(product.getId());
+
+        assertThat(productRepository.existsById(product.getId())).isFalse();
+        Map<String, Object> persistedWish = jdbcTemplate.queryForMap(
+            "select id, member_id, product_id from wish where id = ?",
+            wish.getId()
+        );
+        assertThat(((Number) persistedWish.get("id")).longValue()).isEqualTo(wish.getId());
+        assertThat(((Number) persistedWish.get("member_id")).longValue()).isEqualTo(member.getId());
+        assertThat(((Number) persistedWish.get("product_id")).longValue()).isEqualTo(product.getId());
+    }
+
     private Category saveCategory(String name) {
         return categoryRepository.save(new Category(
             name,
@@ -172,7 +202,15 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
         ));
     }
 
+    private Member saveMember(String suffix) {
+        return memberRepository.save(new Member(TEST_EMAIL_PREFIX + suffix + "@example.com", "password123"));
+    }
+
     private void deleteTestData() {
+        jdbcTemplate.update(
+            "delete from wish where member_id in (select id from member where email like ?)",
+            TEST_EMAIL_PREFIX + "%"
+        );
         jdbcTemplate.update(
             "delete from orders where option_id in (select id from options where product_id in (select id from product where name like ?))",
             TEST_PRODUCT_PREFIX + "%"
@@ -187,5 +225,6 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
         );
         jdbcTemplate.update("delete from product where name like ?", TEST_PRODUCT_PREFIX + "%");
         jdbcTemplate.update("delete from category where name like ?", TEST_CATEGORY_PREFIX + "%");
+        jdbcTemplate.update("delete from member where email like ?", TEST_EMAIL_PREFIX + "%");
     }
 }

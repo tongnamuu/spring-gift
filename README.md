@@ -10,8 +10,9 @@ Spring Boot gift service for practicing production-like execution, automated ver
 - Thymeleaf admin templates are in `src/main/resources/templates`.
 - Docker Compose MySQL setup uses MySQL 8.4.9 LTS in `compose.yaml`.
 - Baseline `./gradlew test`, `./gradlew serviceTest`, and `./gradlew apiTest` currently succeed.
-- API tests now cover category deletion policy, admin product missing-category display, and member registration/login behavior.
-- Category, Product, and member registration now have UseCase/service extraction in progress; remaining controller logic still needs the same treatment.
+- API tests now cover category deletion policy, admin product missing-category display, member registration/login behavior, and wish workflows.
+- Category, Product, Wish, and member registration now have UseCase/service extraction in progress; remaining controller logic still needs the same treatment.
+- Wish is treated as a separate aggregate root and stores `memberId`/`productId` without direct `Member` or `Product` object references.
 
 ## Implementation Strategy
 
@@ -49,7 +50,7 @@ Most remaining Flyway foreign keys are defined without `ON DELETE CASCADE`. In M
 | Target object | Direct FK dependencies | Current risk | Expected policy to define |
 | --- | --- | --- | --- |
 | `Category` | `Product.categoryId` value reference only; no DB FK after `V3__Remove_product_category_foreign_key.sql`. | Products can keep a category id whose category row was deleted. | Allow category deletion and display missing category rows as `미분류 카테고리`. |
-| `Product` | `wish.product_id -> product.id`, `options.product_id -> product.id` | Wishes block product deletion. Options may be removed through the product aggregate, but ordered options are still blocked by orders. | Reject product deletion while wishes or orders exist for the product. |
+| `Product` | `options.product_id -> product.id`; `wish.product_id` value reference only after `V4__Remove_wish_product_foreign_key.sql`. | Wishes can keep a product id whose product row was deleted. Ordered options can still block product deletion through `orders.option_id`. | Delete products without changing wishes; wish lists hide wishes whose product row is missing. Reject product deletion when orders still reference its options. |
 | `Option` | `orders.option_id -> options.id` | Deleting an option that was ordered will fail at the database level. | Reject option deletion while orders reference it; also keep the existing rule that a product needs at least one option. |
 | `Member` | `wish.member_id -> member.id`, `orders.member_id -> member.id` | Deleting a member with wishes or orders will fail at the database level. | Define whether wishes are cleaned up, but reject deletion when order history exists. |
 | `Wish` | None currently identified. | Wish deletion is the lowest FK risk, but ownership validation must remain explicit. | Allow deletion only by the owning member. |
@@ -85,7 +86,7 @@ Earlier runtime verification on the local application confirmed that FK failures
 | Request | Observed response | Runtime exception | FK constraint |
 | --- | --- | --- | --- |
 | `DELETE /api/categories/1` | `500 Internal Server Error` | `DataIntegrityViolationException` from `SQLIntegrityConstraintViolationException` | `product.category_id -> category.id` (`product_ibfk_1`) |
-| `DELETE /api/products/1` | `500 Internal Server Error` | `DataIntegrityViolationException` from `SQLIntegrityConstraintViolationException` | `wish.product_id -> product.id` (`wish_ibfk_2`) |
+| `DELETE /api/products/1` | `500 Internal Server Error` | `DataIntegrityViolationException` from `SQLIntegrityConstraintViolationException` | `wish.product_id -> product.id` (`wish_ibfk_2`), later removed by `V4__Remove_wish_product_foreign_key.sql` |
 | `DELETE /api/products/2/options/3` | `500 Internal Server Error` | `DataIntegrityViolationException` from `SQLIntegrityConstraintViolationException` | `orders.option_id -> options.id` (`orders_ibfk_1`) |
 | `POST /admin/members/2/delete` | `500 Internal Server Error` | `DataIntegrityViolationException` from `SQLIntegrityConstraintViolationException` | `orders.member_id -> member.id` (`orders_ibfk_2`) |
 
@@ -154,8 +155,11 @@ Object-specific implementation checklist is tracked in `docs/refactoring-change-
 - `./gradlew test --rerun-tasks` - passed with current contract unit tests.
 - `./gradlew serviceTest --rerun-tasks` - passed against Docker Compose MySQL test database.
 - `./gradlew apiTest --rerun-tasks` - passed; includes member registration/login tests and concurrent duplicate-registration handling.
+- `./gradlew test --tests "gift.wish.domain.WishContractTest" --rerun-tasks` - passed.
+- `./gradlew serviceTest --tests "gift.wish.service.WishServiceTest" --rerun-tasks` - passed against Docker Compose MySQL test database.
+- `./gradlew apiTest --tests "gift.wish.controller.WishApiTest" --rerun-tasks` - passed against Docker Compose MySQL test database.
 - Cucumber feature files added under `src/test/resources/features`; step definitions and runner are not configured yet.
-- `./gradlew build` - pending before final handoff.
+- `./gradlew build --rerun-tasks` - passed.
 
 ## AI Usage Record
 

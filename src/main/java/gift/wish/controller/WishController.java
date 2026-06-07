@@ -1,0 +1,99 @@
+package gift.wish.controller;
+
+import gift.auth.AuthenticationResolver;
+import gift.wish.service.WishAccessDeniedException;
+import gift.wish.usecase.AddWishResult;
+import gift.wish.usecase.AddWishUseCase;
+import gift.wish.usecase.GetWishesUseCase;
+import gift.wish.usecase.RemoveWishUseCase;
+import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.net.URI;
+import java.util.NoSuchElementException;
+
+@RestController
+@RequestMapping("/api/wishes")
+public class WishController {
+    private final AuthenticationResolver authenticationResolver;
+    private final GetWishesUseCase getWishesUseCase;
+    private final AddWishUseCase addWishUseCase;
+    private final RemoveWishUseCase removeWishUseCase;
+
+    public WishController(
+        AuthenticationResolver authenticationResolver,
+        GetWishesUseCase getWishesUseCase,
+        AddWishUseCase addWishUseCase,
+        RemoveWishUseCase removeWishUseCase
+    ) {
+        this.authenticationResolver = authenticationResolver;
+        this.getWishesUseCase = getWishesUseCase;
+        this.addWishUseCase = addWishUseCase;
+        this.removeWishUseCase = removeWishUseCase;
+    }
+
+    @GetMapping
+    public ResponseEntity<Page<WishResponse>> getWishes(
+        @RequestHeader(value = "Authorization", required = false) String authorization,
+        Pageable pageable
+    ) {
+        var member = authenticationResolver.extractMember(authorization);
+        if (member == null) {
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(getWishesUseCase.execute(member.getId(), pageable));
+    }
+
+    @PostMapping
+    public ResponseEntity<WishResponse> addWish(
+        @RequestHeader(value = "Authorization", required = false) String authorization,
+        @Valid @RequestBody WishRequest request
+    ) {
+        var member = authenticationResolver.extractMember(authorization);
+        if (member == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        AddWishResult result = addWishUseCase.execute(member.getId(), request);
+        if (!result.created()) {
+            return ResponseEntity.ok(result.response());
+        }
+        return ResponseEntity.created(URI.create("/api/wishes/" + result.response().id()))
+            .body(result.response());
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> removeWish(
+        @RequestHeader(value = "Authorization", required = false) String authorization,
+        @PathVariable Long id
+    ) {
+        var member = authenticationResolver.extractMember(authorization);
+        if (member == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        removeWishUseCase.execute(member.getId(), id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @ExceptionHandler(NoSuchElementException.class)
+    public ResponseEntity<Void> handleNoSuchElement() {
+        return ResponseEntity.notFound().build();
+    }
+
+    @ExceptionHandler(WishAccessDeniedException.class)
+    public ResponseEntity<Void> handleWishAccessDenied() {
+        return ResponseEntity.status(403).build();
+    }
+}

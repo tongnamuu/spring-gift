@@ -5,7 +5,7 @@ import gift.member.Member;
 import gift.member.MemberRepository;
 import gift.product.entity.Option;
 import gift.product.repository.OptionRepository;
-import gift.wish.WishRepository;
+import gift.wish.domain.WishRepository;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
