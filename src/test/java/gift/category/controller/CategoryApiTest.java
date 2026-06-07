@@ -15,6 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import static gift.product.support.ProductFixtures.product;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CategoryApiTest extends AbstractMysqlApiTest {
@@ -88,7 +90,7 @@ class CategoryApiTest extends AbstractMysqlApiTest {
     }
 
     private Product saveProduct(String name, Long categoryId) {
-        return productRepository.save(new Product(
+        return productRepository.save(product(
             name,
             1_000,
             "https://example.com/category-api-product.png",

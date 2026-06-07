@@ -33,6 +33,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Map;
 
+import static gift.product.support.ProductFixtures.product;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class OrderApiTest extends AbstractMysqlApiTest {
@@ -273,7 +275,7 @@ class OrderApiTest extends AbstractMysqlApiTest {
             "https://example.com/order-api-category.png",
             "order api test category"
         ));
-        return productRepository.save(new Product(
+        return productRepository.save(product(
             TEST_PRODUCT_PREFIX + Integer.toUnsignedString(suffix.hashCode(), 36),
             UNIT_PRICE,
             PRODUCT_IMAGE_URL,

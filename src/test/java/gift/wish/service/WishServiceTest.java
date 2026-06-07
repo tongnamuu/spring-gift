@@ -28,6 +28,8 @@ import java.sql.PreparedStatement;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
+import static gift.product.support.ProductFixtures.product;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -211,7 +213,7 @@ class WishServiceTest extends AbstractMysqlServiceTest {
             "https://example.com/wish-category.png",
             "wish service test category"
         ));
-        return productRepository.save(new Product(
+        return productRepository.save(product(
             TEST_PRODUCT_PREFIX + Integer.toUnsignedString(suffix.hashCode(), 36),
             1000,
             "https://example.com/wish-product.png",

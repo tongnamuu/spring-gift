@@ -10,9 +10,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+
+import static gift.product.support.ProductFixtures.product;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -43,6 +50,32 @@ class AdminProductApiTest extends AbstractMysqlApiTest {
     }
 
     @Test
+    void createProductShowsNegativePriceErrorAndDoesNotPersist() {
+        Category category = categoryRepository.save(new Category(
+            TEST_CATEGORY_PREFIX + "negative",
+            "#123456",
+            "https://example.com/admin-category.png",
+            "admin product negative price category"
+        ));
+        String name = TEST_PRODUCT_PREFIX + "negative";
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/admin/products",
+            formEntity(
+                "name", name,
+                "price", "-1",
+                "imageUrl", "https://example.com/admin-product-negative.png",
+                "categoryId", String.valueOf(category.getId())
+            ),
+            String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).contains("상품 가격은 0 이상이어야 합니다.");
+        assertThat(countProductsByName(name)).isZero();
+    }
+
+    @Test
     void productListDisplaysUncategorizedWhenCategoryIsMissing() {
         Category category = categoryRepository.save(new Category(
             TEST_CATEGORY_PREFIX + "missing",
@@ -50,7 +83,7 @@ class AdminProductApiTest extends AbstractMysqlApiTest {
             "https://example.com/admin-category.png",
             "admin product list category"
         ));
-        Product product = productRepository.save(new Product(
+        Product product = productRepository.save(product(
             TEST_PRODUCT_PREFIX + "x",
             1_000,
             "https://example.com/admin-product.png",
@@ -64,6 +97,25 @@ class AdminProductApiTest extends AbstractMysqlApiTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).contains(product.getName());
         assertThat(response.getBody()).contains("미분류 카테고리");
+    }
+
+    private HttpEntity<MultiValueMap<String, String>> formEntity(String... values) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        for (int index = 0; index < values.length; index += 2) {
+            form.add(values[index], values[index + 1]);
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        return new HttpEntity<>(form, headers);
+    }
+
+    private long countProductsByName(String name) {
+        return jdbcTemplate.queryForObject(
+            "select count(*) from product where name = ?",
+            Long.class,
+            name
+        );
     }
 
     private void deleteTestData() {

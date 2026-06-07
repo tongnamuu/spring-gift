@@ -25,6 +25,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Map;
 
+import static gift.product.support.ProductFixtures.product;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class WishApiTest extends AbstractMysqlApiTest {
@@ -250,7 +252,7 @@ class WishApiTest extends AbstractMysqlApiTest {
             "https://example.com/wish-category.png",
             "wish api test category"
         ));
-        return productRepository.save(new Product(
+        return productRepository.save(product(
             TEST_PRODUCT_PREFIX + Integer.toUnsignedString(suffix.hashCode(), 36),
             1000,
             "https://example.com/wish-product.png",

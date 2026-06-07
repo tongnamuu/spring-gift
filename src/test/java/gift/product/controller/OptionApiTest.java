@@ -20,6 +20,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import static gift.product.support.ProductFixtures.product;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class OptionApiTest extends AbstractMysqlApiTest {
@@ -81,7 +83,7 @@ class OptionApiTest extends AbstractMysqlApiTest {
             "https://example.com/option-api-category.png",
             "option api test category"
         ));
-        return productRepository.save(new Product(
+        return productRepository.save(product(
             TEST_PRODUCT_PREFIX + "last",
             10_000,
             "https://example.com/option-api-product.png",

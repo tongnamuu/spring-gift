@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 
+import static gift.product.support.ProductFixtures.product;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class OrderContractTest {
@@ -82,7 +84,7 @@ class OrderContractTest {
     }
 
     private Option option() {
-        Product product = new Product(
+        Product product = product(
             "테스트 상품",
             30000,
             "https://example.com/product.png",

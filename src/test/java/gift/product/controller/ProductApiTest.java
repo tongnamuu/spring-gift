@@ -3,6 +3,7 @@ package gift.product.controller;
 import gift.category.domain.Category;
 import gift.category.domain.CategoryRepository;
 import gift.product.dto.ProductRequest;
+import gift.product.dto.ProductResponse;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
 import gift.support.AbstractMysqlApiTest;
@@ -16,6 +17,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+
+import static gift.product.support.ProductFixtures.product;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -43,6 +46,50 @@ class ProductApiTest extends AbstractMysqlApiTest {
     @AfterEach
     void tearDown() {
         deleteTestData();
+    }
+
+    @Test
+    void createProductAllowsZeroPrice() {
+        Category category = saveCategory("zero");
+        ProductRequest request = new ProductRequest(
+            TEST_PRODUCT_PREFIX + "zero",
+            0,
+            "https://example.com/product-zero.png",
+            category.getId()
+        );
+
+        ResponseEntity<ProductResponse> response = restTemplate.postForEntity(
+            "/api/products",
+            request,
+            ProductResponse.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().price()).isZero();
+        assertThat(findPrice(response.getBody().id())).isZero();
+    }
+
+    @Test
+    void createProductReturnsBadRequestWhenPriceIsNegative() {
+        Category category = saveCategory("negative");
+        String name = TEST_PRODUCT_PREFIX + "negative";
+        ProductRequest request = new ProductRequest(
+            name,
+            -1,
+            "https://example.com/product-negative.png",
+            category.getId()
+        );
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/api/products",
+            request,
+            String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isEqualTo("상품 가격은 0 이상이어야 합니다.");
+        assertThat(countProductsByName(name)).isZero();
     }
 
     @Test
@@ -104,12 +151,28 @@ class ProductApiTest extends AbstractMysqlApiTest {
     }
 
     private Product saveProduct(String suffix, Long categoryId) {
-        return productRepository.save(new Product(
+        return productRepository.save(product(
             TEST_PRODUCT_PREFIX + suffix,
             10_000,
             "https://example.com/product-api.png",
             categoryId
         ));
+    }
+
+    private int findPrice(Long productId) {
+        return jdbcTemplate.queryForObject(
+            "select price from product where id = ?",
+            Integer.class,
+            productId
+        );
+    }
+
+    private long countProductsByName(String name) {
+        return jdbcTemplate.queryForObject(
+            "select count(*) from product where name = ?",
+            Long.class,
+            name
+        );
     }
 
     private void deleteTestData() {

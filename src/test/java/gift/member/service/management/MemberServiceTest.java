@@ -40,6 +40,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
+import static gift.product.support.ProductFixtures.product;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -516,7 +518,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
             "https://example.com/member-category-" + suffix + ".png",
             "member service category " + suffix
         ));
-        Product product = new Product(
+        Product product = product(
             TEST_PRODUCT_PREFIX + suffix,
             1_000,
             "https://example.com/member-product-" + suffix + ".png",

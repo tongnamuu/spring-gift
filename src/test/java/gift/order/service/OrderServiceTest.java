@@ -12,6 +12,8 @@ import gift.order.dto.OrderCommand;
 import gift.product.dto.OptionResponse;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
+import gift.product.vo.ProductName;
+import gift.product.vo.ProductPrice;
 import gift.product.dto.OptionCommand;
 import gift.product.usecase.CreateOptionUseCase;
 import gift.product.usecase.DeleteOptionUseCase;
@@ -35,6 +37,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static gift.product.support.ProductFixtures.product;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -252,7 +256,7 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
     }
 
     private Product saveProduct(Category category) {
-        return productRepository.save(new Product(
+        return productRepository.save(product(
             ORIGINAL_PRODUCT_NAME,
             ORIGINAL_UNIT_PRICE,
             ORIGINAL_IMAGE_URL,
@@ -271,7 +275,12 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
     private void updateProductAfterOrder(Long productId, Long categoryId) {
         Product product = productRepository.findById(productId)
             .orElseThrow(() -> new NoSuchElementException("상품이 존재하지 않습니다. id=" + productId));
-        product.update(CHANGED_PRODUCT_NAME, CHANGED_UNIT_PRICE, CHANGED_IMAGE_URL, categoryId);
+        product.update(
+            ProductName.allowingKakao(CHANGED_PRODUCT_NAME),
+            new ProductPrice(CHANGED_UNIT_PRICE),
+            CHANGED_IMAGE_URL,
+            categoryId
+        );
         productRepository.save(product);
     }
 

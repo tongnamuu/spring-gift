@@ -28,6 +28,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
+import static gift.product.support.ProductFixtures.product;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AdminMemberApiTest extends AbstractMysqlApiTest {
@@ -309,7 +311,7 @@ class AdminMemberApiTest extends AbstractMysqlApiTest {
             "https://example.com/admin-member-category-" + suffix + ".png",
             "admin member category " + suffix
         ));
-        Product product = new Product(
+        Product product = product(
             TEST_PRODUCT_PREFIX + suffix,
             1_000,
             "https://example.com/admin-member-product-" + suffix + ".png",

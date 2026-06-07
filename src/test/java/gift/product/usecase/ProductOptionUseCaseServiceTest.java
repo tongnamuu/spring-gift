@@ -28,6 +28,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static gift.product.support.ProductFixtures.product;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -175,7 +177,7 @@ class ProductOptionUseCaseServiceTest extends AbstractMysqlServiceTest {
             "https://example.com/category.png",
             "product option service test category"
         ));
-        return productRepository.save(new Product(
+        return productRepository.save(product(
             name,
             10000,
             "https://example.com/product.png",

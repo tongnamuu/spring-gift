@@ -9,6 +9,7 @@ import gift.product.usecase.GetProductsUseCase;
 import gift.product.dto.ProductCommand;
 import gift.product.usecase.UpdateProductUseCase;
 import gift.product.vo.ProductName;
+import gift.product.vo.ProductPrice;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -97,7 +98,7 @@ public class ProductController {
     private ProductCommand toCommand(ProductRequest request) {
         return new ProductCommand(
             new ProductName(request.name()),
-            request.price(),
+            new ProductPrice(request.price()),
             request.imageUrl(),
             request.categoryId()
         );

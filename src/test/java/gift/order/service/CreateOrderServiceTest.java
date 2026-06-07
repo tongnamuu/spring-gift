@@ -16,6 +16,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.lang.reflect.Field;
 import java.util.Optional;
 
+import static gift.product.support.ProductFixtures.product;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,7 +45,7 @@ class CreateOrderServiceTest {
             eventPublisher
         );
         Member member = kakaoMember(100000);
-        Product product = product();
+        Product product = productWithOption();
         when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
         when(productRepository.findByOptionId(OPTION_ID)).thenReturn(Optional.of(product));
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -74,7 +76,7 @@ class CreateOrderServiceTest {
             eventPublisher
         );
         Member member = kakaoMember(1000);
-        Product product = product();
+        Product product = productWithOption();
         when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
         when(productRepository.findByOptionId(OPTION_ID)).thenReturn(Optional.of(product));
 
@@ -94,8 +96,8 @@ class CreateOrderServiceTest {
         return member;
     }
 
-    private Product product() {
-        Product product = new Product(
+    private Product productWithOption() {
+        Product product = product(
             "2025 햅쌀",
             30000,
             "https://example.com/rice.png",

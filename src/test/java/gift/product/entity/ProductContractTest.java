@@ -1,5 +1,7 @@
 package gift.product.entity;
 
+import gift.product.vo.ProductName;
+import gift.product.vo.ProductPrice;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -12,8 +14,8 @@ class ProductContractTest {
     @Test
     void productReferencesCategoryById() {
         Product product = new Product(
-            "테스트 상품",
-            10000,
+            new ProductName("테스트 상품"),
+            new ProductPrice(10000),
             "https://example.com/product.png",
             1L
         );
@@ -36,8 +38,8 @@ class ProductContractTest {
         Product product = product("기존 상품");
 
         product.update(
-            "변경 상품",
-            20000,
+            new ProductName("변경 상품"),
+            new ProductPrice(20000),
             "https://example.com/new-product.png",
             2L
         );
@@ -55,8 +57,8 @@ class ProductContractTest {
         setUpdateDt(product, previousUpdateDt);
 
         product.update(
-            "수정된 상품",
-            20000,
+            new ProductName("수정된 상품"),
+            new ProductPrice(20000),
             "https://example.com/updated-product.png",
             2L
         );
@@ -169,8 +171,8 @@ class ProductContractTest {
 
     private Product product(String name) {
         return new Product(
-            name,
-            10000,
+            new ProductName(name),
+            new ProductPrice(10000),
             "https://example.com/product.png",
             1L
         );

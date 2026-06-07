@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static gift.product.support.ProductFixtures.product;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CategoryServiceTest extends AbstractMysqlServiceTest {
@@ -178,7 +180,7 @@ class CategoryServiceTest extends AbstractMysqlServiceTest {
     }
 
     private Product saveProduct(String name, Long categoryId) {
-        return productRepository.save(new Product(
+        return productRepository.save(product(
             name,
             1_000,
             "https://example.com/category-product.png",

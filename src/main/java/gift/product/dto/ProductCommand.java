@@ -2,10 +2,11 @@ package gift.product.dto;
 
 import gift.product.entity.Product;
 import gift.product.vo.ProductName;
+import gift.product.vo.ProductPrice;
 
 public record ProductCommand(
     ProductName name,
-    int price,
+    ProductPrice price,
     String imageUrl,
     Long categoryId
 ) {

@@ -14,6 +14,7 @@ import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
 import gift.product.vo.OptionName;
 import gift.product.vo.ProductName;
+import gift.product.vo.ProductPrice;
 import gift.support.AbstractMysqlServiceTest;
 import gift.wish.domain.Wish;
 import gift.wish.domain.WishRepository;
@@ -27,6 +28,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Map;
 import java.util.Optional;
+
+import static gift.product.support.ProductFixtures.product;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -244,7 +247,7 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
     }
 
     private Product saveProduct(String name, Long categoryId) {
-        return productRepository.save(new Product(
+        return productRepository.save(product(
             name,
             10000,
             "https://example.com/product.png",
@@ -255,7 +258,7 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
     private ProductCommand productCommand(ProductRequest request) {
         return new ProductCommand(
             new ProductName(request.name()),
-            request.price(),
+            new ProductPrice(request.price()),
             request.imageUrl(),
             request.categoryId()
         );

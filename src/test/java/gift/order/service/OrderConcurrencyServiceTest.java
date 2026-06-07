@@ -37,6 +37,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
+import static gift.product.support.ProductFixtures.product;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
@@ -251,7 +253,7 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
             "https://example.com/order-category.png",
             "order concurrency test category"
         ));
-        return productRepository.save(new Product(
+        return productRepository.save(product(
             TEST_PRODUCT_PREFIX + suffix,
             productPrice,
             "https://example.com/order-product.png",

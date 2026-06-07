@@ -14,6 +14,7 @@ import gift.product.usecase.GetAdminProductsUseCase;
 import gift.product.usecase.GetProductFormCategoriesUseCase;
 import gift.product.usecase.UpdateAdminProductUseCase;
 import gift.product.vo.ProductName;
+import gift.product.vo.ProductPrice;
 import gift.support.AbstractMysqlServiceTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +23,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.NoSuchElementException;
+
+import static gift.product.support.ProductFixtures.product;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -70,7 +73,7 @@ class AdminProductUseCaseServiceTest extends AbstractMysqlServiceTest {
     @Test
     void getAdminProductsReturnsProducts() {
         Category category = saveCategory("list");
-        Product product = productRepository.save(new Product(
+        Product product = productRepository.save(product(
             TEST_PRODUCT_PREFIX + "list",
             1_000,
             "https://example.com/admin-product-list.png",
@@ -94,7 +97,7 @@ class AdminProductUseCaseServiceTest extends AbstractMysqlServiceTest {
     @Test
     void getAdminProductReturnsProduct() {
         Category category = saveCategory("get");
-        Product product = productRepository.save(new Product(
+        Product product = productRepository.save(product(
             TEST_PRODUCT_PREFIX + "get",
             1_000,
             "https://example.com/admin-product-get.png",
@@ -135,7 +138,7 @@ class AdminProductUseCaseServiceTest extends AbstractMysqlServiceTest {
     void updateAdminProductUpdatesProduct() {
         Category originalCategory = saveCategory("update-original");
         Category nextCategory = saveCategory("update-next");
-        Product product = productRepository.save(new Product(
+        Product product = productRepository.save(product(
             TEST_PRODUCT_PREFIX + "before",
             1_000,
             "https://example.com/admin-product-before.png",
@@ -159,7 +162,7 @@ class AdminProductUseCaseServiceTest extends AbstractMysqlServiceTest {
     @Test
     void deleteAdminProductDeletesProduct() {
         Category category = saveCategory("delete");
-        Product product = productRepository.save(new Product(
+        Product product = productRepository.save(product(
             TEST_PRODUCT_PREFIX + "delete",
             1_000,
             "https://example.com/admin-product-delete.png",
@@ -183,7 +186,7 @@ class AdminProductUseCaseServiceTest extends AbstractMysqlServiceTest {
     private ProductCommand productCommand(String suffix, Long categoryId) {
         return new ProductCommand(
             ProductName.allowingKakao(TEST_PRODUCT_PREFIX + suffix),
-            2_000,
+            new ProductPrice(2_000),
             "https://example.com/admin-product-" + suffix + ".png",
             categoryId
         );

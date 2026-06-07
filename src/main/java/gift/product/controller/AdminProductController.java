@@ -10,6 +10,7 @@ import gift.product.usecase.GetAdminProductsUseCase;
 import gift.product.usecase.GetProductFormCategoriesUseCase;
 import gift.product.usecase.UpdateAdminProductUseCase;
 import gift.product.vo.ProductName;
+import gift.product.vo.ProductPrice;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -70,13 +72,13 @@ public class AdminProductController {
         @RequestParam Long categoryId,
         Model model
     ) {
-        ProductNameResult productNameResult = productNameAllowingKakao(name);
-        if (productNameResult.hasError()) {
-            populateNewForm(model, List.of(productNameResult.error()), name, price, imageUrl, categoryId);
+        ProductInputResult productInputResult = productInputAllowingKakao(name, price);
+        if (productInputResult.hasErrors()) {
+            populateNewForm(model, productInputResult.errors(), name, price, imageUrl, categoryId);
             return "product/new";
         }
 
-        createAdminProductUseCase.execute(toCommand(productNameResult.name(), price, imageUrl, categoryId));
+        createAdminProductUseCase.execute(toCommand(productInputResult.name(), productInputResult.price(), imageUrl, categoryId));
         return "redirect:/admin/products";
     }
 
@@ -101,13 +103,13 @@ public class AdminProductController {
         ProductResponse product = getAdminProductUseCase.execute(id)
             .orElseThrow(() -> new NoSuchElementException("상품이 존재하지 않습니다. id=" + id));
 
-        ProductNameResult productNameResult = productNameAllowingKakao(name);
-        if (productNameResult.hasError()) {
-            populateEditForm(model, product, List.of(productNameResult.error()), name, price, imageUrl, categoryId);
+        ProductInputResult productInputResult = productInputAllowingKakao(name, price);
+        if (productInputResult.hasErrors()) {
+            populateEditForm(model, product, productInputResult.errors(), name, price, imageUrl, categoryId);
             return "product/edit";
         }
 
-        updateAdminProductUseCase.execute(id, toCommand(productNameResult.name(), price, imageUrl, categoryId));
+        updateAdminProductUseCase.execute(id, toCommand(productInputResult.name(), productInputResult.price(), imageUrl, categoryId));
         return "redirect:/admin/products";
     }
 
@@ -156,29 +158,33 @@ public class AdminProductController {
             .collect(Collectors.toMap(CategoryResponse::id, CategoryResponse::name));
     }
 
-    private ProductCommand toCommand(ProductName name, int price, String imageUrl, Long categoryId) {
+    private ProductCommand toCommand(ProductName name, ProductPrice price, String imageUrl, Long categoryId) {
         return new ProductCommand(name, price, imageUrl, categoryId);
     }
 
-    private ProductNameResult productNameAllowingKakao(String name) {
+    private ProductInputResult productInputAllowingKakao(String name, int price) {
+        List<String> errors = new ArrayList<>();
+        ProductName productName = null;
+        ProductPrice productPrice = null;
+
         try {
-            return ProductNameResult.valid(ProductName.allowingKakao(name));
+            productName = ProductName.allowingKakao(name);
         } catch (IllegalArgumentException e) {
-            return ProductNameResult.invalid(e.getMessage());
+            errors.add(e.getMessage());
         }
+
+        try {
+            productPrice = new ProductPrice(price);
+        } catch (IllegalArgumentException e) {
+            errors.add(e.getMessage());
+        }
+
+        return new ProductInputResult(productName, productPrice, errors);
     }
 
-    private record ProductNameResult(ProductName name, String error) {
-        private static ProductNameResult valid(ProductName name) {
-            return new ProductNameResult(name, null);
-        }
-
-        private static ProductNameResult invalid(String error) {
-            return new ProductNameResult(null, error);
-        }
-
-        private boolean hasError() {
-            return error != null;
+    private record ProductInputResult(ProductName name, ProductPrice price, List<String> errors) {
+        private boolean hasErrors() {
+            return !errors.isEmpty();
         }
     }
 }

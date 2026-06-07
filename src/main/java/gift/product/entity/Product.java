@@ -11,6 +11,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Version;
 import gift.product.vo.OptionName;
 import gift.product.vo.ProductName;
+import gift.product.vo.ProductPrice;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -40,7 +41,7 @@ public class Product {
     protected Product() {
     }
 
-    public Product(String name, int price, String imageUrl, Long categoryId) {
+    private Product(String name, int price, String imageUrl, Long categoryId) {
         this.name = name;
         this.price = price;
         this.imageUrl = imageUrl;
@@ -48,8 +49,8 @@ public class Product {
         this.updateDt = LocalDateTime.now();
     }
 
-    public Product(ProductName name, int price, String imageUrl, Long categoryId) {
-        this(name.value(), price, imageUrl, categoryId);
+    public Product(ProductName name, ProductPrice price, String imageUrl, Long categoryId) {
+        this(name.value(), price.value(), imageUrl, categoryId);
     }
 
     @PrePersist
@@ -59,7 +60,7 @@ public class Product {
         }
     }
 
-    public void update(String name, int price, String imageUrl, Long categoryId) {
+    private void update(String name, int price, String imageUrl, Long categoryId) {
         this.name = name;
         this.price = price;
         this.imageUrl = imageUrl;
@@ -67,8 +68,8 @@ public class Product {
         recordUpdated();
     }
 
-    public void update(ProductName name, int price, String imageUrl, Long categoryId) {
-        update(name.value(), price, imageUrl, categoryId);
+    public void update(ProductName name, ProductPrice price, String imageUrl, Long categoryId) {
+        update(name.value(), price.value(), imageUrl, categoryId);
     }
 
     public Option addOption(String name, int quantity) {
