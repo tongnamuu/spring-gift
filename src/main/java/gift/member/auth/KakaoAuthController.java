@@ -1,8 +1,7 @@
 package gift.member.auth;
 
-import gift.member.usecase.auth.GetKakaoLoginUriUseCase;
 import gift.member.usecase.auth.KakaoAuthorizationCodeCommand;
-import gift.member.usecase.auth.LoginWithKakaoAuthorizationCodeUseCase;
+import gift.member.usecase.auth.LoginWithKakaoUseCase;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,27 +19,27 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping(path = "/api/auth/kakao")
 public class KakaoAuthController {
-    private final GetKakaoLoginUriUseCase getKakaoLoginUriUseCase;
-    private final LoginWithKakaoAuthorizationCodeUseCase loginWithKakaoAuthorizationCodeUseCase;
+    private final KakaoAuthorizationUriProvider kakaoAuthorizationUriProvider;
+    private final LoginWithKakaoUseCase loginWithKakaoUseCase;
 
     public KakaoAuthController(
-        GetKakaoLoginUriUseCase getKakaoLoginUriUseCase,
-        LoginWithKakaoAuthorizationCodeUseCase loginWithKakaoAuthorizationCodeUseCase
+        KakaoAuthorizationUriProvider kakaoAuthorizationUriProvider,
+        LoginWithKakaoUseCase loginWithKakaoUseCase
     ) {
-        this.getKakaoLoginUriUseCase = getKakaoLoginUriUseCase;
-        this.loginWithKakaoAuthorizationCodeUseCase = loginWithKakaoAuthorizationCodeUseCase;
+        this.kakaoAuthorizationUriProvider = kakaoAuthorizationUriProvider;
+        this.loginWithKakaoUseCase = loginWithKakaoUseCase;
     }
 
     @GetMapping(path = "/login")
     public ResponseEntity<Void> login() {
         return ResponseEntity.status(HttpStatus.FOUND)
-            .header(HttpHeaders.LOCATION, getKakaoLoginUriUseCase.execute().toString())
+            .header(HttpHeaders.LOCATION, kakaoAuthorizationUriProvider.provide().toString())
             .build();
     }
 
     @GetMapping(path = "/callback")
     public ResponseEntity<TokenResponse> callback(@RequestParam("code") String code) {
-        return ResponseEntity.ok(loginWithKakaoAuthorizationCodeUseCase.execute(toCommand(code)));
+        return ResponseEntity.ok(loginWithKakaoUseCase.execute(toCommand(code)));
     }
 
     private KakaoAuthorizationCodeCommand toCommand(String code) {

@@ -2,6 +2,6 @@ package gift.member.usecase.auth;
 
 import gift.member.auth.TokenResponse;
 
-public interface LoginWithKakaoAuthorizationCodeUseCase {
+public interface LoginWithKakaoUseCase {
     TokenResponse execute(KakaoAuthorizationCodeCommand command);
 }

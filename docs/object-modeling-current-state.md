@@ -288,7 +288,7 @@ Aggregate를 조회한 뒤 응답으로 조립한다. 관리자 Thymeleaf 컨트
 | `category` | `GetCategoriesUseCase`, `CreateCategoryUseCase`, `UpdateCategoryUseCase`, `DeleteCategoryUseCase` |
 | `product` | `GetProductsUseCase`, `GetProductUseCase`, `CreateProductUseCase`, `UpdateProductUseCase`, `DeleteProductUseCase`, 관리자 상품용 인터페이스 |
 | `option` | `GetOptionsUseCase`, `CreateOptionUseCase`, `DeleteOptionUseCase` |
-| `member` | 등록/로그인, Kakao 로그인 URI/callback, 관리자 회원 조회/생성/수정/삭제/포인트 충전 인터페이스 |
+| `member` | 등록/로그인, Kakao 로그인, 관리자 회원 조회/생성/수정/삭제/포인트 충전 인터페이스 |
 | `wish` | `GetWishesUseCase`, `AddWishUseCase`, `RemoveWishUseCase` |
 | `order` | `GetOrdersUseCase`, `CreateOrderUseCase` |
 

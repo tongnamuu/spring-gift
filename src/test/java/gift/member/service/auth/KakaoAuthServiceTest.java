@@ -5,9 +5,8 @@ import gift.member.auth.KakaoLoginClient;
 import gift.member.auth.TokenResponse;
 import gift.member.domain.Member;
 import gift.member.domain.MemberRepository;
-import gift.member.usecase.auth.GetKakaoLoginUriUseCase;
 import gift.member.usecase.auth.KakaoAuthorizationCodeCommand;
-import gift.member.usecase.auth.LoginWithKakaoAuthorizationCodeUseCase;
+import gift.member.usecase.auth.LoginWithKakaoUseCase;
 import gift.support.AbstractMysqlServiceTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,8 +18,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
-
-import java.net.URI;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -34,10 +31,7 @@ class KakaoAuthServiceTest extends AbstractMysqlServiceTest {
     private static final String TEST_EMAIL_PREFIX = "kakao-service-";
 
     @Autowired
-    private GetKakaoLoginUriUseCase getKakaoLoginUriUseCase;
-
-    @Autowired
-    private LoginWithKakaoAuthorizationCodeUseCase loginWithKakaoAuthorizationCodeUseCase;
+    private LoginWithKakaoUseCase loginWithKakaoUseCase;
 
     @Autowired
     private JwtProvider jwtProvider;
@@ -64,22 +58,11 @@ class KakaoAuthServiceTest extends AbstractMysqlServiceTest {
     }
 
     @Test
-    void getKakaoLoginUriContainsAuthorizationParameters() {
-        URI uri = getKakaoLoginUriUseCase.execute();
-
-        assertThat(uri.toString()).startsWith("https://kauth.kakao.com/oauth/authorize");
-        assertThat(uri.toString()).contains("response_type=code");
-        assertThat(uri.toString()).contains("client_id=test-client-id");
-        assertThat(uri.toString()).contains("redirect_uri=http://localhost:8080/api/auth/kakao/callback");
-        assertThat(uri.toString()).contains("scope=account_email,talk_message");
-    }
-
-    @Test
-    void loginWithKakaoAuthorizationCodeCreatesMemberAndReturnsToken() {
+    void loginWithKakaoCreatesMemberAndReturnsToken() {
         String email = TEST_EMAIL_PREFIX + "new@example.com";
         kakaoLoginClient.prepare("kakao-access-token-new", email);
 
-        TokenResponse response = loginWithKakaoAuthorizationCodeUseCase.execute(
+        TokenResponse response = loginWithKakaoUseCase.execute(
             new KakaoAuthorizationCodeCommand("authorization-code")
         );
 
@@ -92,12 +75,12 @@ class KakaoAuthServiceTest extends AbstractMysqlServiceTest {
     }
 
     @Test
-    void loginWithKakaoAuthorizationCodeUpdatesExistingMemberToken() {
+    void loginWithKakaoUpdatesExistingMemberToken() {
         String email = TEST_EMAIL_PREFIX + "existing@example.com";
         Member existing = memberRepository.save(new Member(email, "password123"));
         kakaoLoginClient.prepare("kakao-access-token-updated", email);
 
-        TokenResponse response = loginWithKakaoAuthorizationCodeUseCase.execute(
+        TokenResponse response = loginWithKakaoUseCase.execute(
             new KakaoAuthorizationCodeCommand("authorization-code")
         );
 

@@ -84,7 +84,109 @@ Current policy:
 
 ## Member Registration And Login
 
-Member registration, member login, Kakao login URI creation, and Kakao callback login have been extracted to one-action UseCase services. Current API tests verify the observable behavior against the real MySQL test database.
+Member registration, member login, and Kakao login have been extracted to one-action UseCase services. Kakao authorization URI creation is an auxiliary OAuth component, not a UseCase. Current API tests verify the observable behavior against the real MySQL test database.
+
+### Authentication Class And Data Flow
+
+#### 일반 회원가입
+
+Classes:
+
+- `MemberController`
+- `MemberRequest`
+- `MemberCredentialsCommand`
+- `RegisterMemberUseCase` / `RegisterMemberService`
+- `CreateMemberUseCase` / `CreateMemberService`
+- `MemberRepository`
+- `Member`
+- `JwtProvider`
+- `TokenResponse`
+
+Data flow:
+
+1. `POST /api/members/register` receives `MemberRequest(email, password)`.
+2. `MemberController` validates the request and converts it to `MemberCredentialsCommand`.
+3. `RegisterMemberService` delegates member creation to `CreateMemberUseCase`.
+4. `CreateMemberService` checks `MemberRepository.existsByEmail(email)`.
+5. If the email is new, `CreateMemberService` saves `new Member(email, password)`.
+6. If a concurrent insert violates the unique email constraint, `CreateMemberService` converts it to `IllegalArgumentException("Email is already registered.")`.
+7. `RegisterMemberService` creates a JWT with `JwtProvider.createToken(member.getEmail())`.
+8. The API returns `TokenResponse(token)`.
+
+#### 일반 로그인
+
+Classes:
+
+- `MemberController`
+- `MemberRequest`
+- `MemberCredentialsCommand`
+- `LoginMemberUseCase` / `LoginMemberService`
+- `MemberRepository`
+- `Member`
+- `JwtProvider`
+- `TokenResponse`
+
+Data flow:
+
+1. `POST /api/members/login` receives `MemberRequest(email, password)`.
+2. `MemberController` validates the request and converts it to `MemberCredentialsCommand`.
+3. `LoginMemberService` loads the member with `MemberRepository.findByEmail(email)`.
+4. If the member is missing, has no password, or the password does not match, the service throws `IllegalArgumentException("Invalid email or password.")`.
+5. If the password matches, `LoginMemberService` creates a JWT with `JwtProvider.createToken(member.getEmail())`.
+6. The API returns `TokenResponse(token)`.
+
+#### Kakao 회원가입
+
+Classes:
+
+- `KakaoAuthController`
+- `KakaoAuthorizationUriProvider`
+- `KakaoAuthorizationCodeCommand`
+- `LoginWithKakaoUseCase` / `LoginWithKakaoService`
+- `KakaoLoginClient` / `KakaoLoginRestClient`
+- `KakaoLoginProperties`
+- `MemberRepository`
+- `Member`
+- `JwtProvider`
+- `TokenResponse`
+
+Data flow:
+
+1. `GET /api/auth/kakao/login` redirects to the Kakao authorization URI built by `KakaoAuthorizationUriProvider`.
+2. Kakao redirects back to `GET /api/auth/kakao/callback?code=...`.
+3. `KakaoAuthController` converts the authorization code to `KakaoAuthorizationCodeCommand`.
+4. `LoginWithKakaoService` calls `KakaoLoginClient.requestAccessToken(code)`.
+5. `KakaoLoginRestClient` exchanges the code with Kakao using `KakaoLoginProperties`.
+6. `LoginWithKakaoService` calls `KakaoLoginClient.requestUserInfo(accessToken)` and reads the Kakao account email.
+7. If `MemberRepository.findByEmail(email)` is empty, the service creates `new Member(email)` as a Kakao member without a local password.
+8. The service stores the Kakao access token with `member.updateKakaoAccessToken(accessToken)` and saves the member.
+9. The service creates a service JWT with `JwtProvider.createToken(member.getEmail())`.
+10. The API returns `TokenResponse(token)`.
+
+#### Kakao 로그인
+
+Classes:
+
+- `KakaoAuthController`
+- `KakaoAuthorizationUriProvider`
+- `KakaoAuthorizationCodeCommand`
+- `LoginWithKakaoUseCase` / `LoginWithKakaoService`
+- `KakaoLoginClient` / `KakaoLoginRestClient`
+- `MemberRepository`
+- `Member`
+- `JwtProvider`
+- `TokenResponse`
+
+Data flow:
+
+1. `GET /api/auth/kakao/login` redirects to the Kakao authorization URI built by `KakaoAuthorizationUriProvider`.
+2. Kakao redirects back to `GET /api/auth/kakao/callback?code=...`.
+3. `KakaoAuthController` converts the authorization code to `KakaoAuthorizationCodeCommand`.
+4. `LoginWithKakaoService` exchanges the authorization code for a Kakao access token and user email through `KakaoLoginClient`.
+5. If `MemberRepository.findByEmail(email)` returns an existing member, the service reuses that member instead of creating a new one.
+6. The service updates the stored Kakao access token with the latest token.
+7. The service creates a new service JWT with `JwtProvider.createToken(member.getEmail())`.
+8. The API returns `TokenResponse(token)`.
 
 Current behavior:
 

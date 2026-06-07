@@ -131,7 +131,7 @@ Mockito `verify(times/never)`를 사용한다.
 | `Category` | 완료: 생성, 목록, 수정, 삭제 UseCase 존재 | 완료: Category 서비스는 메서드 단위 `@Transactional` 사용 | 완료: `Category`는 Product 없이 존재할 수 있는 Aggregate root | TODO: 중복 Category 이름, 동시 수정/삭제 확인 |
 | `Product` | 현재 Product/Option 흐름은 완료, 관리자 Product UseCase 구현 검토 필요 | 부분 완료: Product 서비스는 메서드 단위 `@Transactional` 사용, 관리자 흐름 검토 필요 | 완료: `Product`는 Aggregate root이고 `categoryId`만 저장하며 `Option` 재고 변경을 루트 메서드로 수행한다 | 주문 재고 차감과 주문 중 옵션 삭제 동시성은 Product version으로 확인했다. TODO: Wish, Order, 누락 Category와 동시 삭제/수정 경쟁 확인 |
 | `Option` | 부분 완료: Product 패키지 아래에서 목록/생성/삭제 UseCase 존재 | 현재 Option 서비스는 완료, 이후 수정 흐름 추가 시 경계 필요 | 완료: `Option`은 별도 root가 아니라 `Product`에 소유된다 | 주문 재고 차감, 동시 옵션 삭제, 주문 중 옵션 삭제 충돌, 동시 중복 이름 생성은 Product 루트 version으로 해결했다. |
-| `Member` | 완료: 회원가입/로그인/Kakao 로그인 URI/Kakao callback/관리자 생성/목록/단건 조회/수정/삭제/포인트 충전 UseCase 존재 | 완료: 회원가입, 로그인, Kakao callback, 관리자 회원, 포인트 충전, 주문 포인트 차감 서비스 경계 존재 | TODO: Wish, Order, Point, Kakao access token을 기준으로 `Member` root 경계 확인 | 중복 회원가입과 주문 포인트 차감은 완료, TODO: 동시 포인트 충전과 Member 삭제 확인 |
+| `Member` | 완료: 회원가입/로그인/Kakao 로그인/관리자 생성/목록/단건 조회/수정/삭제/포인트 충전 UseCase 존재. Kakao 인가 URI 생성은 UseCase가 아니라 `KakaoAuthorizationUriProvider`가 담당한다. | 완료: 회원가입, 로그인, Kakao callback, 관리자 회원, 포인트 충전, 주문 포인트 차감 서비스 경계 존재 | TODO: Wish, Order, Point, Kakao access token을 기준으로 `Member` root 경계 확인 | 중복 회원가입과 주문 포인트 차감은 완료, TODO: 동시 포인트 충전과 Member 삭제 확인 |
 | `Wish` | 완료: 추가, 목록, 삭제 UseCase 식별 및 서비스 구현 | 완료: Wish 서비스는 메서드 단위 `@Transactional` 사용 | 완료: `Wish`는 별도 루트이며 `memberId`, `productId` 값만 보관한다. 삭제 소유권은 `memberId`로 검증한다. | TODO: 동시 중복 Wish 추가와 소유권 기반 삭제 경쟁 확인 |
 | `Order` | 완료: 생성 UseCase 서비스와 목록 UseCase 서비스 존재 | 완료: 생성/목록 서비스는 메서드 단위 `@Transactional` 사용 | 완료: `Order`는 불변 이력 Aggregate root로 보고 Product/Option/Member를 id 값과 주문 당시 스냅샷으로 보관한다 | 재고/포인트 차감 동시성, 목록 스냅샷, Kakao afterCommit async, 주문 후 Wish 유지는 완료 |
 
@@ -207,7 +207,7 @@ Mockito `verify(times/never)`를 사용한다.
 - [x] 동시 중복 회원가입이 `400 Bad Request`를 반환하도록 수정한다.
 - [x] Member 포인트 충전/차감과 식별성 규칙 계약 테스트를 추가한다.
 - [x] 로그인 로직을 하나의 API 동작에 대응하는 UseCase 서비스로 추출한다.
-- [x] Kakao 로그인 URI 생성과 Kakao callback 자동 회원가입/로그인을 하나의 API 동작당 하나의 UseCase 서비스로 추출한다.
+- [x] Kakao callback 자동 회원가입/로그인은 `LoginWithKakaoUseCase`로 두고, Kakao 로그인 URI 생성은 UseCase가 아닌 보조 provider로 분리한다.
 - [x] 관리자 포인트 충전 동작을 하나의 UseCase 서비스로 추출한다.
 - [x] 관리자 회원 생성/목록/단건 조회/수정/삭제 동작을 각각 하나의 UseCase 서비스로 추출한다.
 - [x] Member 관련 일반 API, 인증, 관리자, 도메인 패키지를 `gift.member` 하위로 정리하고, service/usecase는 `auth`와 `management`로 분류한다.

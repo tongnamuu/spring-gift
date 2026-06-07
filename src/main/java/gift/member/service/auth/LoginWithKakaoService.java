@@ -6,17 +6,17 @@ import gift.member.auth.TokenResponse;
 import gift.member.domain.Member;
 import gift.member.domain.MemberRepository;
 import gift.member.usecase.auth.KakaoAuthorizationCodeCommand;
-import gift.member.usecase.auth.LoginWithKakaoAuthorizationCodeUseCase;
+import gift.member.usecase.auth.LoginWithKakaoUseCase;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class LoginWithKakaoAuthorizationCodeService implements LoginWithKakaoAuthorizationCodeUseCase {
+public class LoginWithKakaoService implements LoginWithKakaoUseCase {
     private final KakaoLoginClient kakaoLoginClient;
     private final MemberRepository memberRepository;
     private final JwtProvider jwtProvider;
 
-    public LoginWithKakaoAuthorizationCodeService(
+    public LoginWithKakaoService(
         KakaoLoginClient kakaoLoginClient,
         MemberRepository memberRepository,
         JwtProvider jwtProvider

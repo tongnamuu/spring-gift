@@ -1,22 +1,19 @@
-package gift.member.service.auth;
+package gift.member.auth;
 
-import gift.member.auth.KakaoLoginProperties;
-import gift.member.usecase.auth.GetKakaoLoginUriUseCase;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 
-@Service
-public class GetKakaoLoginUriService implements GetKakaoLoginUriUseCase {
+@Component
+public class KakaoAuthorizationUriProvider {
     private final KakaoLoginProperties properties;
 
-    public GetKakaoLoginUriService(KakaoLoginProperties properties) {
+    public KakaoAuthorizationUriProvider(KakaoLoginProperties properties) {
         this.properties = properties;
     }
 
-    @Override
-    public URI execute() {
+    public URI provide() {
         return UriComponentsBuilder.fromUriString("https://kauth.kakao.com/oauth/authorize")
             .queryParam("response_type", "code")
             .queryParam("client_id", properties.clientId())
