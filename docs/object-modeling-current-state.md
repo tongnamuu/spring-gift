@@ -293,8 +293,9 @@ Aggregate를 조회한 뒤 응답으로 조립한다. 관리자 Thymeleaf 컨트
 | `wish` | `GetWishesUseCase`, `AddWishUseCase`, `RemoveWishUseCase` |
 | `order` | `GetOrdersUseCase`, `CreateOrderUseCase` |
 
-UseCase 연결은 객체별로 진행 중이다. 현재 Category, Product 일부 흐름, Member
-회원가입, Wish 추가/목록/삭제, Order 생성/목록 흐름은 UseCase 서비스를 통해 실행된다.
+UseCase 연결은 객체별로 진행 중이다. 현재 Category, Product 일반 API와 관리자 상품
+흐름, Member 회원가입/로그인/관리자 흐름, Wish 추가/목록/삭제, Order 생성/목록 흐름은
+UseCase 서비스를 통해 실행된다.
 
 ## Main Object Flows
 
@@ -308,8 +309,9 @@ UseCase 연결은 객체별로 진행 중이다. 현재 Category, Product 일부
 6. `ProductRepository`에 저장한다.
 7. 상품 단건/목록 조회 응답은 `product.query.ProductQueryDao`가 `product`와 `options`를 명시적 SQL로 조회해 옵션 목록을 포함한 `ProductResponse`로 만든다.
 
-관리자 상품 화면도 같은 엔티티와 리포지토리를 사용하지만, API DTO 대신 폼 파라미터와
-Thymeleaf 모델을 직접 다룬다.
+관리자 상품 화면도 같은 `Product` 엔티티를 화면 모델로 사용하지만, 컨트롤러는
+repository를 직접 호출하지 않고 관리자 상품 UseCase에 위임한다. 폼 파라미터의 상품명은
+컨트롤러에서 `ProductName.allowingKakao`로 검증한 뒤 `ProductCommand`로 서비스에 전달한다.
 
 ### Option
 

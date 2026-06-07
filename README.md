@@ -11,7 +11,7 @@ Spring Boot gift service for practicing production-like execution, automated ver
 - Docker Compose MySQL setup uses MySQL 8.4.9 LTS in `compose.yaml`.
 - Baseline `./gradlew test`, `./gradlew serviceTest`, and `./gradlew apiTest` currently succeed.
 - API tests now cover category deletion policy, admin product missing-category display, member registration/login behavior, and wish workflows.
-- Category, Product, Wish, member registration, and order creation/listing now have UseCase/service extraction in progress; remaining controller logic still needs the same treatment.
+- Category, Product including admin product screens, Wish, Member auth/admin flows, and Order creation/listing now run through UseCase/service boundaries.
 - Member code is grouped under `gift.member`; auth/admin/controller/domain are separated, and service/usecase classes are further grouped into `auth` and `management` workflows.
 - Wish is treated as a separate aggregate root and stores `memberId`/`productId` without direct `Member` or `Product` object references.
 - Product is the aggregate root for option stock changes. Order creation updates option quantity through `Product.subtractOptionQuantity(...)`, and Product/Member optimistic versions guard stock and point concurrency.

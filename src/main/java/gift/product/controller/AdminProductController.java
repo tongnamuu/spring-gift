@@ -1,9 +1,14 @@
 package gift.product.controller;
 
 import gift.category.domain.Category;
-import gift.category.domain.CategoryRepository;
+import gift.product.dto.ProductCommand;
 import gift.product.entity.Product;
-import gift.product.repository.ProductRepository;
+import gift.product.usecase.CreateAdminProductUseCase;
+import gift.product.usecase.DeleteAdminProductUseCase;
+import gift.product.usecase.GetAdminProductUseCase;
+import gift.product.usecase.GetAdminProductsUseCase;
+import gift.product.usecase.GetProductFormCategoriesUseCase;
+import gift.product.usecase.UpdateAdminProductUseCase;
 import gift.product.vo.ProductName;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -21,24 +26,39 @@ import java.util.stream.Collectors;
 @Controller
 @RequestMapping("/admin/products")
 public class AdminProductController {
-    private final ProductRepository productRepository;
-    private final CategoryRepository categoryRepository;
+    private final GetAdminProductsUseCase getAdminProductsUseCase;
+    private final GetAdminProductUseCase getAdminProductUseCase;
+    private final CreateAdminProductUseCase createAdminProductUseCase;
+    private final UpdateAdminProductUseCase updateAdminProductUseCase;
+    private final DeleteAdminProductUseCase deleteAdminProductUseCase;
+    private final GetProductFormCategoriesUseCase getProductFormCategoriesUseCase;
 
-    public AdminProductController(ProductRepository productRepository, CategoryRepository categoryRepository) {
-        this.productRepository = productRepository;
-        this.categoryRepository = categoryRepository;
+    public AdminProductController(
+        GetAdminProductsUseCase getAdminProductsUseCase,
+        GetAdminProductUseCase getAdminProductUseCase,
+        CreateAdminProductUseCase createAdminProductUseCase,
+        UpdateAdminProductUseCase updateAdminProductUseCase,
+        DeleteAdminProductUseCase deleteAdminProductUseCase,
+        GetProductFormCategoriesUseCase getProductFormCategoriesUseCase
+    ) {
+        this.getAdminProductsUseCase = getAdminProductsUseCase;
+        this.getAdminProductUseCase = getAdminProductUseCase;
+        this.createAdminProductUseCase = createAdminProductUseCase;
+        this.updateAdminProductUseCase = updateAdminProductUseCase;
+        this.deleteAdminProductUseCase = deleteAdminProductUseCase;
+        this.getProductFormCategoriesUseCase = getProductFormCategoriesUseCase;
     }
 
     @GetMapping
     public String list(Model model) {
-        model.addAttribute("products", productRepository.findAll());
+        model.addAttribute("products", getAdminProductsUseCase.execute());
         model.addAttribute("categoryNames", categoryNames());
         return "product/list";
     }
 
     @GetMapping("/new")
     public String newForm(Model model) {
-        model.addAttribute("categories", categoryRepository.findAll());
+        model.addAttribute("categories", getProductFormCategoriesUseCase.execute());
         return "product/new";
     }
 
@@ -56,19 +76,16 @@ public class AdminProductController {
             return "product/new";
         }
 
-        if (!categoryRepository.existsById(categoryId)) {
-            throw new NoSuchElementException("카테고리가 존재하지 않습니다. id=" + categoryId);
-        }
-        productRepository.save(new Product(productNameResult.name(), price, imageUrl, categoryId));
+        createAdminProductUseCase.execute(toCommand(productNameResult.name(), price, imageUrl, categoryId));
         return "redirect:/admin/products";
     }
 
     @GetMapping("/{id}/edit")
     public String editForm(@PathVariable Long id, Model model) {
-        Product product = productRepository.findById(id)
+        Product product = getAdminProductUseCase.execute(id)
             .orElseThrow(() -> new NoSuchElementException("상품이 존재하지 않습니다. id=" + id));
         model.addAttribute("product", product);
-        model.addAttribute("categories", categoryRepository.findAll());
+        model.addAttribute("categories", getProductFormCategoriesUseCase.execute());
         return "product/edit";
     }
 
@@ -81,7 +98,7 @@ public class AdminProductController {
         @RequestParam Long categoryId,
         Model model
     ) {
-        Product product = productRepository.findById(id)
+        Product product = getAdminProductUseCase.execute(id)
             .orElseThrow(() -> new NoSuchElementException("상품이 존재하지 않습니다. id=" + id));
 
         ProductNameResult productNameResult = productNameAllowingKakao(name);
@@ -90,18 +107,13 @@ public class AdminProductController {
             return "product/edit";
         }
 
-        if (!categoryRepository.existsById(categoryId)) {
-            throw new NoSuchElementException("카테고리가 존재하지 않습니다. id=" + categoryId);
-        }
-
-        product.update(productNameResult.name(), price, imageUrl, categoryId);
-        productRepository.save(product);
+        updateAdminProductUseCase.execute(id, toCommand(productNameResult.name(), price, imageUrl, categoryId));
         return "redirect:/admin/products";
     }
 
     @PostMapping("/{id}/delete")
     public String delete(@PathVariable Long id) {
-        productRepository.deleteById(id);
+        deleteAdminProductUseCase.execute(id);
         return "redirect:/admin/products";
     }
 
@@ -118,7 +130,7 @@ public class AdminProductController {
         model.addAttribute("price", price);
         model.addAttribute("imageUrl", imageUrl);
         model.addAttribute("categoryId", categoryId);
-        model.addAttribute("categories", categoryRepository.findAll());
+        model.addAttribute("categories", getProductFormCategoriesUseCase.execute());
     }
 
     private void populateEditForm(
@@ -136,12 +148,16 @@ public class AdminProductController {
         model.addAttribute("price", price);
         model.addAttribute("imageUrl", imageUrl);
         model.addAttribute("categoryId", categoryId);
-        model.addAttribute("categories", categoryRepository.findAll());
+        model.addAttribute("categories", getProductFormCategoriesUseCase.execute());
     }
 
     private Map<Long, String> categoryNames() {
-        return categoryRepository.findAll().stream()
+        return getProductFormCategoriesUseCase.execute().stream()
             .collect(Collectors.toMap(Category::getId, Category::getName));
+    }
+
+    private ProductCommand toCommand(ProductName name, int price, String imageUrl, Long categoryId) {
+        return new ProductCommand(name, price, imageUrl, categoryId);
     }
 
     private ProductNameResult productNameAllowingKakao(String name) {

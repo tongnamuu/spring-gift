@@ -5,7 +5,6 @@ import gift.member.usecase.auth.LoginMemberUseCase;
 import gift.member.dto.MemberCredentialsCommand;
 import gift.member.usecase.auth.RegisterMemberUseCase;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,7 +24,6 @@ public class MemberController {
     private final RegisterMemberUseCase registerMemberUseCase;
     private final LoginMemberUseCase loginMemberUseCase;
 
-    @Autowired
     public MemberController(
         RegisterMemberUseCase registerMemberUseCase,
         LoginMemberUseCase loginMemberUseCase

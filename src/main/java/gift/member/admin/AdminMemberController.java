@@ -7,7 +7,6 @@ import gift.member.usecase.management.DeleteMemberUseCase;
 import gift.member.usecase.management.GetMemberUseCase;
 import gift.member.usecase.management.GetMembersUseCase;
 import gift.member.usecase.management.UpdateMemberUseCase;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,7 +33,6 @@ public class AdminMemberController {
     private final DeleteMemberUseCase deleteMemberUseCase;
     private final ChargeMemberPointUseCase chargeMemberPointUseCase;
 
-    @Autowired
     public AdminMemberController(
         GetMembersUseCase getMembersUseCase,
         GetMemberUseCase getMemberUseCase,
