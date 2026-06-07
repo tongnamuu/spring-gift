@@ -11,7 +11,7 @@ Spring Boot gift service for practicing production-like execution, automated ver
 - Docker Compose MySQL setup uses MySQL 8.4.9 LTS in `compose.yaml`.
 - Baseline `./gradlew test`, `./gradlew serviceTest`, and `./gradlew apiTest` currently succeed.
 - API tests now cover category deletion policy, admin product missing-category display, and member registration/login behavior.
-- Controllers currently contain most business logic; service extraction is still pending.
+- Category, Product, and member registration now have UseCase/service extraction in progress; remaining controller logic still needs the same treatment.
 
 ## Implementation Strategy
 
@@ -21,6 +21,11 @@ Spring Boot gift service for practicing production-like execution, automated ver
 - Use Angular-style commit messages such as `docs:`, `test:`, `refactor:`, and `fix:`.
 - Do not skip or disable tests to make a change pass.
 - Verify behavior through observable results, not only absence of exceptions.
+
+## Refactoring Change Log
+
+Detailed refactoring changes, policy changes, and object-specific TODOs are tracked in Korean in
+`docs/refactoring-change-log.md`.
 
 ## Currently Identified Problems
 
@@ -54,7 +59,7 @@ Related behavior gap: order creation currently has a documented intent to remove
 
 ## Member Registration And Login
 
-Member registration and login are still implemented directly in `MemberController`. Current API tests verify the observable behavior against the real MySQL test database.
+Member registration has been extracted to a UseCase service. Login is still implemented directly in `MemberController`. Current API tests verify the observable behavior against the real MySQL test database.
 
 Current behavior:
 
@@ -138,29 +143,7 @@ Required Kakao consent items:
 
 ## Implementation Checklist
 
-- [x] Configure local development to use a non-EOL MySQL LTS version.
-- [x] Define black-box Cucumber feature specifications for API workflows.
-- [ ] Add deterministic test configuration using H2 and Flyway.
-- [ ] Add baseline domain tests for product/option validators, stock subtraction, and point deduction.
-- [ ] Add API or service tests for product, category, option, member, wish, and order workflows.
-- [ ] Extract service layer from controllers without changing behavior.
-- [ ] Add service-level transaction boundaries for read and write use cases.
-- [ ] Move Kakao message sending to after successful order commit.
-- [ ] Implement order-created wish cleanup for the buyer and ordered product.
-- [ ] Strengthen domain responsibility around option stock and member points.
-- [ ] Run final verification with `./gradlew test` and `./gradlew build`.
-- [ ] Record AI usage and verification evidence in this README.
-
-## Planned Commit Order
-
-1. `docs: separate homework instructions from plan`
-2. `test: add baseline coverage for domain rules`
-3. `refactor: extract service layer`
-4. `refactor: add transaction boundaries`
-5. `fix: clean up wish after order creation`
-6. `fix: send kakao message after order commit`
-7. `test: cover main api workflows`
-8. `docs: record verification and ai usage`
+Object-specific implementation checklist is tracked in `docs/refactoring-change-log.md`.
 
 ## Verification Log
 
