@@ -80,6 +80,7 @@ Mockito `verify(times/never)`를 사용한다.
 | `현재 작업` | 두 옵션을 동시에 삭제하면 둘 다 성공해 등록된 모든 옵션이 제거될 수 있었다. | `Product.version` 경계에서 삭제 충돌을 감지하고, 옵션이 등록된 상품의 마지막 옵션 삭제를 금지하는 규칙을 서비스/API 테스트로 고정했다. 상품 생성 시점에는 옵션 없이 존재할 수 있다. 마지막 옵션 삭제 메시지는 `옵션이 1개인 상품은 옵션을 삭제할 수 없습니다.`이다. |
 | `현재 작업` | 주문으로 옵션 재고를 차감하는 동시에 같은 Product의 옵션이 삭제될 수 있다. | 두 트랜잭션이 같은 Product version을 읽으면 하나만 커밋되고 다른 하나는 optimistic lock failure로 실패한다는 서비스 테스트를 추가했다. |
 | `현재 작업` | 단순 요청값 검증이 트랜잭션 서비스 내부 또는 HTTP request DTO 의존 경계에 남아 있을 수 있었다. | 컨트롤러가 Bean Validation 이후 `ProductName`/`OptionName` VO와 각 도메인 command를 생성하고, UseCase 서비스는 command만 받는다. 존재 확인, 중복, 소유권, 재고/포인트 부족처럼 DB 또는 Aggregate 상태에 의존하는 규칙만 트랜잭션 내부에 둔다. |
+| `현재 작업` | `GET /api/orders` 미인증 요청이 컨트롤러 인증 로직 전에 `400 Bad Request`로 처리됐다. | Order API도 Authorization header를 optional로 받고 인증 resolver 결과가 없으면 `401 Unauthorized`를 반환하게 했다. `OrderApiTest`로 생성, 목록, 실패, 인증, Wish 유지 계약을 고정했다. |
 
 ## 식별된 정책 변경
 
@@ -115,7 +116,7 @@ Mockito `verify(times/never)`를 사용한다.
 | `Option` | 부분 완료: product/option 서비스 테스트로 일부 커버하지만 독립 계약 테스트는 아직 없다. | 완료: `ProductOptionUseCaseServiceTest`, `OptionApiTest`, `OrderServiceTest`, `OrderConcurrencyServiceTest` | 진행 중: Option 동작은 Product usecase/service 흐름 아래에 있고, 생성/삭제/재고 차감은 Product 루트 메서드로 수행한다. 생성 입력은 `OptionName` VO와 `OptionCommand`로 전달하고 조회 API는 `OptionQueryDao`가 담당한다. | Order는 Option id와 스냅샷만 보관하므로 주문된 Option도 Product Aggregate 규칙상 삭제 가능하면 삭제된다. 상품 생성 시 옵션은 없어도 되지만, 옵션이 등록된 뒤 마지막 옵션 삭제는 금지한다. |
 | `Member` | 미완료: 포인트와 식별성 규칙 계약 테스트가 필요하다. | 완료: 회원가입/로그인 API, 회원가입 서비스 테스트, 주문 포인트 동시성 서비스 테스트 | 부분 완료: 회원가입 UseCase 서비스는 존재하고 로그인/관리자 회원 로직은 아직 컨트롤러에 남아 있다. | 중복 회원가입과 주문 포인트 차감 동시성은 해결됐고, Wish/Order가 있을 때의 Member 삭제 정책이 더 필요하다. |
 | `Wish` | 완료: `WishContractTest` | 완료: `WishServiceTest`, `WishApiTest` | 완료: controller, domain, query, service, usecase 패키지 분리, 추가 입력은 `WishCommand`로 전달, `Member`/`Product` 직접 객체 참조 제거, 목록 응답용 `wish`-`product` 조인 쿼리 분리 | 현재 API 정책은 정의됨: 인증 필요, 중복 추가는 기존 Wish 반환, 삭제는 소유자만 가능. Product가 없는 Wish는 목록에서 미노출한다. 동시 중복 추가와 Product/Member 삭제 정책은 남아 있다. |
-| `Order` | 부분 완료: `OrderContractTest`, `CreateOrderServiceTest`, `KakaoOrderMessageListenerTest` | 부분 완료: `OrderServiceTest`, `OrderConcurrencyServiceTest` | 완료: controller, domain, query, service, usecase 패키지 분리. 생성 입력은 `OrderCommand`로 전달하고, 목록 조회는 `JdbcTemplate` query DAO로 `orders` 스냅샷을 읽는다. Order는 `productId`, `optionId`, `memberId` 값과 주문 당시 스냅샷을 보관한다. | 재고/포인트 동시성, 주문 목록 스냅샷, Kakao afterCommit async, 주문 후 Wish 유지 정책은 해결됐다. |
+| `Order` | 부분 완료: `OrderContractTest`, `CreateOrderServiceTest`, `KakaoOrderMessageListenerTest` | 완료: `OrderServiceTest`, `OrderConcurrencyServiceTest`, `OrderApiTest` | 완료: controller, domain, query, service, usecase 패키지 분리. 생성 입력은 `OrderCommand`로 전달하고, 목록 조회는 `JdbcTemplate` query DAO로 `orders` 스냅샷을 읽는다. Order는 `productId`, `optionId`, `memberId` 값과 주문 당시 스냅샷을 보관한다. | 재고/포인트 동시성, 주문 목록 스냅샷, Kakao afterCommit async, 주문 후 Wish 유지 정책, 미인증 API 응답 정책은 해결됐다. |
 
 ## 객체별 리팩터링 TODO
 
@@ -228,7 +229,7 @@ Mockito `verify(times/never)`를 사용한다.
 - [x] Kakao 이벤트 발행 단위 테스트와 afterCommit 비동기 전송 서비스 테스트를 추가한다.
 - [x] 주문된 Option 삭제 후 Order 이력이 유지되는 서비스 테스트를 추가한다.
 - [x] 주문 생성 후 Wish가 유지되는 서비스 테스트를 추가한다.
-- [ ] 주문 이력 API 테스트를 추가한다.
+- [x] 주문 이력 API 테스트를 추가한다.
 - [x] 컨트롤러의 주문 목록 로직을 `GetOrdersUseCase`로 추출한다.
 - [x] Order controller, domain, service, usecase 패키지를 분리한다.
 - [x] Order 조회 UseCase 구현체와 query 객체를 query 패키지로 분리한다.

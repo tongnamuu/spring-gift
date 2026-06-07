@@ -37,7 +37,7 @@ public class OrderController {
 
     @GetMapping
     public ResponseEntity<?> getOrders(
-        @RequestHeader("Authorization") String authorization,
+        @RequestHeader(value = "Authorization", required = false) String authorization,
         Pageable pageable
     ) {
         // auth check
@@ -51,7 +51,7 @@ public class OrderController {
 
     @PostMapping
     public ResponseEntity<?> createOrder(
-        @RequestHeader("Authorization") String authorization,
+        @RequestHeader(value = "Authorization", required = false) String authorization,
         @Valid @RequestBody OrderRequest request
     ) {
         // auth check
