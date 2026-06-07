@@ -4,6 +4,7 @@ import gift.category.domain.Category;
 import gift.category.domain.CategoryRepository;
 import gift.member.domain.Member;
 import gift.member.domain.MemberRepository;
+import gift.member.vo.Password;
 import gift.order.controller.OrderResponse;
 import gift.order.domain.Order;
 import gift.order.domain.OrderRepository;
@@ -233,7 +234,7 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
     }
 
     private Member saveMember(String suffix, int point) {
-        Member member = new Member(TEST_EMAIL_PREFIX + suffix + "@example.com", "password123");
+        Member member = new Member(TEST_EMAIL_PREFIX + suffix + "@example.com", Password.encode("password123"));
         member.chargePoint(point);
         return memberRepository.save(member);
     }

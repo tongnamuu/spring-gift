@@ -4,6 +4,7 @@ import gift.member.auth.JwtProvider;
 import gift.member.auth.TokenResponse;
 import gift.member.domain.Member;
 import gift.member.domain.MemberRepository;
+import gift.member.vo.Password;
 import gift.support.AbstractMysqlApiTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,12 +69,14 @@ class MemberApiTest extends AbstractMysqlApiTest {
 
         Member persisted = memberRepository.findByEmail(request.email()).orElseThrow();
         assertThat(persisted.getEmail()).isEqualTo(request.email());
+        assertThat(persisted.getPassword()).isNotEqualTo(request.password());
+        assertThat(Password.encode(request.password()).matches(persisted.getPassword())).isTrue();
     }
 
     @Test
     void registerReturnsBadRequestWhenEmailAlreadyExists() {
         MemberRequest request = new MemberRequest(TEST_EMAIL_PREFIX + "duplicate@example.com", "password123");
-        memberRepository.save(new Member(request.email(), request.password()));
+        memberRepository.save(new Member(request.email(), Password.encode(request.password())));
 
         ResponseEntity<String> response = restTemplate.postForEntity(
             "/api/members/register",
@@ -88,7 +91,7 @@ class MemberApiTest extends AbstractMysqlApiTest {
     @Test
     void registerReturnsBadRequestWhenEmailBelongsToDeletedMember() {
         MemberRequest request = new MemberRequest(TEST_EMAIL_PREFIX + "deleted-register@example.com", "password123");
-        Member member = memberRepository.save(new Member(request.email(), request.password()));
+        Member member = memberRepository.save(new Member(request.email(), Password.encode(request.password())));
         member.markDeleted();
         memberRepository.save(member);
 
@@ -126,7 +129,7 @@ class MemberApiTest extends AbstractMysqlApiTest {
     @Test
     void loginReturnsOkTokenForRegisteredMember() {
         MemberRequest request = new MemberRequest(TEST_EMAIL_PREFIX + "login@example.com", "password123");
-        memberRepository.save(new Member(request.email(), request.password()));
+        saveMemberWithPassword(request.email(), request.password());
 
         ResponseEntity<TokenResponse> response = restTemplate.postForEntity(
             "/api/members/login",
@@ -143,7 +146,7 @@ class MemberApiTest extends AbstractMysqlApiTest {
     @Test
     void loginReturnsBadRequestWhenPasswordDoesNotMatch() {
         String email = TEST_EMAIL_PREFIX + "wrong-password@example.com";
-        memberRepository.save(new Member(email, "password123"));
+        saveMemberWithPassword(email, "password123");
 
         ResponseEntity<String> response = restTemplate.postForEntity(
             "/api/members/login",
@@ -170,7 +173,7 @@ class MemberApiTest extends AbstractMysqlApiTest {
     @Test
     void loginReturnsBadRequestWhenMemberIsDeleted() {
         String email = TEST_EMAIL_PREFIX + "deleted-login@example.com";
-        Member member = memberRepository.save(new Member(email, "password123"));
+        Member member = saveMemberWithPassword(email, "password123");
         member.markDeleted();
         memberRepository.save(member);
 
@@ -208,6 +211,10 @@ class MemberApiTest extends AbstractMysqlApiTest {
 
     private void deleteTestMembers() {
         jdbcTemplate.update("delete from member where email like ?", TEST_EMAIL_PREFIX + "%");
+    }
+
+    private Member saveMemberWithPassword(String email, String password) {
+        return memberRepository.save(new Member(email, Password.encode(password)));
     }
 
     private List<ResponseEntity<String>> postRegisterConcurrently(MemberRequest request, int requestCount) throws Exception {

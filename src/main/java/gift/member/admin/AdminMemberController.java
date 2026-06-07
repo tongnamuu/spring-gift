@@ -7,6 +7,7 @@ import gift.member.usecase.management.DeleteMemberUseCase;
 import gift.member.usecase.management.GetMemberUseCase;
 import gift.member.usecase.management.GetMembersUseCase;
 import gift.member.usecase.management.UpdateMemberUseCase;
+import gift.member.vo.Password;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -67,9 +68,9 @@ public class AdminMemberController {
         Model model
     ) {
         try {
-            createMemberUseCase.execute(email, password);
+            createMemberUseCase.execute(email, Password.encode(password));
         } catch (IllegalArgumentException e) {
-            populateNewFormError(model, email, "Email is already registered.");
+            populateNewFormError(model, email, e.getMessage());
             return "member/new";
         }
 
@@ -90,7 +91,7 @@ public class AdminMemberController {
         @RequestParam String email,
         @RequestParam String password
     ) {
-        updateMemberUseCase.execute(id, email, password);
+        updateMemberUseCase.execute(id, email, Password.encode(password));
         return "redirect:/admin/members";
     }
 

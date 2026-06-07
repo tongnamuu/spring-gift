@@ -17,6 +17,7 @@ import gift.member.usecase.management.GetMembersUseCase;
 import gift.member.usecase.auth.LoginMemberUseCase;
 import gift.member.dto.MemberCredentialsCommand;
 import gift.member.usecase.management.UpdateMemberUseCase;
+import gift.member.vo.Password;
 import gift.wish.domain.Wish;
 import gift.wish.domain.WishRepository;
 import gift.category.domain.Category;
@@ -104,7 +105,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
     void createMemberPersistsMember() {
         String email = TEST_EMAIL_PREFIX + "create@example.com";
 
-        Member member = createMemberUseCase.execute(email, "password123");
+        Member member = createMemberUseCase.execute(email, password("password123"));
 
         assertThat(member.getId()).isNotNull();
         assertThat(member.getEmail()).isEqualTo(email);
@@ -117,16 +118,18 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
         );
         assertThat(((Number) persisted.get("id")).longValue()).isEqualTo(member.getId());
         assertThat(persisted.get("email")).isEqualTo(email);
-        assertThat(persisted.get("password")).isEqualTo("password123");
+        String persistedPassword = (String) persisted.get("password");
+        assertThat(persistedPassword).isNotEqualTo("password123");
+        assertThat(password("password123").matches(persistedPassword)).isTrue();
         assertThat(((Number) persisted.get("point")).intValue()).isZero();
     }
 
     @Test
     void createMemberRejectsDuplicateEmail() {
         String email = TEST_EMAIL_PREFIX + "duplicate@example.com";
-        memberRepository.save(new Member(email, "password123"));
+        memberRepository.save(new Member(email, Password.encode("password123")));
 
-        assertThatThrownBy(() -> createMemberUseCase.execute(email, "another-password"))
+        assertThatThrownBy(() -> createMemberUseCase.execute(email, password("another-password")))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage(DUPLICATE_EMAIL_MESSAGE);
 
@@ -136,11 +139,11 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
     @Test
     void createMemberRejectsDeletedMemberEmail() {
         String email = TEST_EMAIL_PREFIX + "deleted-register@example.com";
-        Member member = memberRepository.save(new Member(email, "password123"));
+        Member member = memberRepository.save(new Member(email, Password.encode("password123")));
         member.markDeleted();
         memberRepository.save(member);
 
-        assertThatThrownBy(() -> createMemberUseCase.execute(email, "another-password"))
+        assertThatThrownBy(() -> createMemberUseCase.execute(email, password("another-password")))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage(DUPLICATE_EMAIL_MESSAGE);
 
@@ -190,9 +193,11 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
     @Test
     void loginMemberReturnsTokenForRegisteredMember() {
         String email = TEST_EMAIL_PREFIX + "login@example.com";
-        memberRepository.save(new Member(email, "password123"));
+        saveMemberWithPassword(email, "password123");
 
-        TokenResponse response = loginMemberUseCase.execute(new MemberCredentialsCommand(email, "password123"));
+        TokenResponse response = loginMemberUseCase.execute(
+            new MemberCredentialsCommand(email, password("password123"))
+        );
 
         assertThat(response.token()).isNotBlank();
         assertThat(jwtProvider.getEmail(response.token())).isEqualTo(email);
@@ -201,9 +206,11 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
     @Test
     void loginMemberRejectsWrongPassword() {
         String email = TEST_EMAIL_PREFIX + "wrong-password@example.com";
-        memberRepository.save(new Member(email, "password123"));
+        saveMemberWithPassword(email, "password123");
 
-        assertThatThrownBy(() -> loginMemberUseCase.execute(new MemberCredentialsCommand(email, "wrong-password")))
+        assertThatThrownBy(() -> loginMemberUseCase.execute(
+            new MemberCredentialsCommand(email, password("wrong-password"))
+        ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Invalid email or password.");
     }
@@ -211,7 +218,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
     @Test
     void loginMemberRejectsMissingMember() {
         assertThatThrownBy(() -> loginMemberUseCase.execute(
-            new MemberCredentialsCommand(TEST_EMAIL_PREFIX + "missing@example.com", "password123")
+            new MemberCredentialsCommand(TEST_EMAIL_PREFIX + "missing@example.com", password("password123"))
         ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Invalid email or password.");
@@ -220,11 +227,13 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
     @Test
     void loginMemberRejectsDeletedMember() {
         String email = TEST_EMAIL_PREFIX + "deleted-login@example.com";
-        Member member = memberRepository.save(new Member(email, "password123"));
+        Member member = saveMemberWithPassword(email, "password123");
         member.markDeleted();
         memberRepository.save(member);
 
-        assertThatThrownBy(() -> loginMemberUseCase.execute(new MemberCredentialsCommand(email, "password123")))
+        assertThatThrownBy(() -> loginMemberUseCase.execute(
+            new MemberCredentialsCommand(email, password("password123"))
+        ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Invalid email or password.");
     }
@@ -232,7 +241,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
     @Test
     void chargeMemberPointUpdatesPersistedPoint() {
         String email = TEST_EMAIL_PREFIX + "charge@example.com";
-        Member member = memberRepository.save(new Member(email, "password123"));
+        Member member = memberRepository.save(new Member(email, Password.encode("password123")));
 
         Member charged = chargeMemberPointUseCase.execute(member.getId(), 3000);
 
@@ -250,7 +259,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
     @Test
     void chargeMemberPointRejectsNonPositiveAmount() {
         String email = TEST_EMAIL_PREFIX + "invalid-charge@example.com";
-        Member member = memberRepository.save(new Member(email, "password123"));
+        Member member = memberRepository.save(new Member(email, Password.encode("password123")));
 
         assertThatThrownBy(() -> chargeMemberPointUseCase.execute(member.getId(), 0))
             .isInstanceOf(IllegalArgumentException.class)
@@ -259,8 +268,8 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
 
     @Test
     void getMembersReturnsMembers() {
-        Member first = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "list-1@example.com", "password123"));
-        Member second = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "list-2@example.com", "password123"));
+        Member first = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "list-1@example.com", Password.encode("password123")));
+        Member second = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "list-2@example.com", Password.encode("password123")));
 
         List<String> emails = getMembersUseCase.execute().stream()
             .map(Member::getEmail)
@@ -271,7 +280,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
 
     @Test
     void getMemberReturnsMemberById() {
-        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "get@example.com", "password123"));
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "get@example.com", Password.encode("password123")));
 
         assertThat(getMemberUseCase.execute(member.getId()))
             .hasValueSatisfying(found -> assertThat(found.getEmail()).isEqualTo(member.getEmail()));
@@ -284,8 +293,8 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
 
     @Test
     void getMembersDoesNotReturnDeletedMembers() {
-        Member active = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "active-list@example.com", "password123"));
-        Member deleted = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "deleted-list@example.com", "password123"));
+        Member active = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "active-list@example.com", Password.encode("password123")));
+        Member deleted = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "deleted-list@example.com", Password.encode("password123")));
         deleted.markDeleted();
         memberRepository.save(deleted);
 
@@ -299,7 +308,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
 
     @Test
     void getMemberReturnsEmptyWhenMemberIsDeleted() {
-        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "deleted-get@example.com", "password123"));
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "deleted-get@example.com", Password.encode("password123")));
         member.markDeleted();
         memberRepository.save(member);
 
@@ -308,10 +317,10 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
 
     @Test
     void updateMemberUpdatesEmailAndPassword() {
-        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "before-update@example.com", "password123"));
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "before-update@example.com", Password.encode("password123")));
         String updatedEmail = TEST_EMAIL_PREFIX + "after-update@example.com";
 
-        Member updated = updateMemberUseCase.execute(member.getId(), updatedEmail, "updated-password");
+        Member updated = updateMemberUseCase.execute(member.getId(), updatedEmail, password("updated-password"));
 
         assertThat(updated.getEmail()).isEqualTo(updatedEmail);
         Map<String, Object> persisted = jdbcTemplate.queryForMap(
@@ -319,7 +328,9 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
             member.getId()
         );
         assertThat(persisted.get("email")).isEqualTo(updatedEmail);
-        assertThat(persisted.get("password")).isEqualTo("updated-password");
+        String persistedPassword = (String) persisted.get("password");
+        assertThat(persistedPassword).isNotEqualTo("updated-password");
+        assertThat(password("updated-password").matches(persistedPassword)).isTrue();
     }
 
     @Test
@@ -327,7 +338,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
         assertThatThrownBy(() -> updateMemberUseCase.execute(
             Long.MAX_VALUE,
             TEST_EMAIL_PREFIX + "missing-update@example.com",
-            "password123"
+            password("password123")
         ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage(MEMBER_NOT_FOUND_MESSAGE);
@@ -335,14 +346,14 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
 
     @Test
     void updateMemberRejectsDeletedMember() {
-        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "deleted-update@example.com", "password123"));
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "deleted-update@example.com", Password.encode("password123")));
         member.markDeleted();
         memberRepository.save(member);
 
         assertThatThrownBy(() -> updateMemberUseCase.execute(
             member.getId(),
             TEST_EMAIL_PREFIX + "after-deleted-update@example.com",
-            "updated-password"
+            password("updated-password")
         ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage(MEMBER_NOT_FOUND_MESSAGE);
@@ -350,7 +361,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
 
     @Test
     void chargeMemberPointRejectsDeletedMember() {
-        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "deleted-charge@example.com", "password123"));
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "deleted-charge@example.com", Password.encode("password123")));
         member.markDeleted();
         memberRepository.save(member);
 
@@ -361,7 +372,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
 
     @Test
     void deleteMemberMarksMemberDeletedWithoutReferences() {
-        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "delete@example.com", "password123"));
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "delete@example.com", Password.encode("password123")));
 
         deleteMemberUseCase.execute(member.getId());
 
@@ -372,7 +383,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
 
     @Test
     void deleteMemberMarksMemberDeletedAndKeepsWishesWhenWishesReferenceMember() {
-        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "wish-delete@example.com", "password123"));
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "wish-delete@example.com", Password.encode("password123")));
         Product product = saveProductWithOption("wish-delete");
         Wish wish = wishRepository.save(new Wish(member.getId(), product.getId()));
 
@@ -385,7 +396,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
 
     @Test
     void deleteMemberMarksMemberDeletedAndKeepsOrderHistory() {
-        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "order-delete@example.com", "password123"));
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "order-delete@example.com", Password.encode("password123")));
         Product product = saveProductWithOption("order-delete");
         Option option = product.getOptions().getFirst();
         Order order = orderRepository.save(new Order(
@@ -420,7 +431,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
                         throw new IllegalStateException("Timed out while waiting to start concurrent member creation.");
                     }
                     try {
-                        createMemberUseCase.execute(email, "password123");
+                        createMemberUseCase.execute(email, password("password123"));
                         return CreateMemberResult.ok();
                     } catch (RuntimeException e) {
                         return CreateMemberResult.failure(e);
@@ -447,6 +458,14 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
             Long.class,
             email
         );
+    }
+
+    private Member saveMemberWithPassword(String email, String password) {
+        return memberRepository.save(new Member(email, Password.encode(password)));
+    }
+
+    private Password password(String rawValue) {
+        return Password.encode(rawValue);
     }
 
     private int findPoint(Long memberId) {

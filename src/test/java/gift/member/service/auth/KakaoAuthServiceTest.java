@@ -7,6 +7,7 @@ import gift.member.domain.Member;
 import gift.member.domain.MemberRepository;
 import gift.member.dto.KakaoAuthorizationCodeCommand;
 import gift.member.usecase.auth.LoginWithKakaoUseCase;
+import gift.member.vo.Password;
 import gift.support.AbstractMysqlServiceTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,7 +79,7 @@ class KakaoAuthServiceTest extends AbstractMysqlServiceTest {
     @Test
     void loginWithKakaoUpdatesExistingMemberToken() {
         String email = TEST_EMAIL_PREFIX + "existing@example.com";
-        Member existing = memberRepository.save(new Member(email, "password123"));
+        Member existing = memberRepository.save(new Member(email, Password.encode("password123")));
         kakaoLoginClient.prepare("kakao-access-token-updated", email);
 
         TokenResponse response = loginWithKakaoUseCase.execute(
@@ -88,7 +89,7 @@ class KakaoAuthServiceTest extends AbstractMysqlServiceTest {
         assertThat(jwtProvider.getEmail(response.token())).isEqualTo(email);
         Member member = memberRepository.findByEmail(email).orElseThrow();
         assertThat(member.getId()).isEqualTo(existing.getId());
-        assertThat(member.getPassword()).isEqualTo("password123");
+        assertThat(Password.encode("password123").matches(member.getPassword())).isTrue();
         assertThat(member.getKakaoAccessToken()).isEqualTo("kakao-access-token-updated");
         assertThat(countMembersByEmail(email)).isEqualTo(1L);
     }
@@ -96,7 +97,7 @@ class KakaoAuthServiceTest extends AbstractMysqlServiceTest {
     @Test
     void loginWithKakaoRejectsDeletedMember() {
         String email = TEST_EMAIL_PREFIX + "deleted@example.com";
-        Member member = memberRepository.save(new Member(email, "password123"));
+        Member member = memberRepository.save(new Member(email, Password.encode("password123")));
         member.markDeleted();
         memberRepository.save(member);
         kakaoLoginClient.prepare("kakao-access-token-deleted", email);

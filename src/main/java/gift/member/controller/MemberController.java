@@ -1,9 +1,10 @@
 package gift.member.controller;
 
 import gift.member.auth.TokenResponse;
-import gift.member.usecase.auth.LoginMemberUseCase;
 import gift.member.dto.MemberCredentialsCommand;
+import gift.member.usecase.auth.LoginMemberUseCase;
 import gift.member.usecase.auth.RegisterMemberUseCase;
+import gift.member.vo.Password;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -48,6 +49,6 @@ public class MemberController {
     }
 
     private MemberCredentialsCommand toCommand(MemberRequest request) {
-        return new MemberCredentialsCommand(request.email(), request.password());
+        return new MemberCredentialsCommand(request.email(), Password.encode(request.password()));
     }
 }

@@ -5,6 +5,7 @@ import gift.category.domain.Category;
 import gift.category.domain.CategoryRepository;
 import gift.member.domain.Member;
 import gift.member.domain.MemberRepository;
+import gift.member.vo.Password;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
 import gift.support.AbstractMysqlApiTest;
@@ -239,7 +240,7 @@ class WishApiTest extends AbstractMysqlApiTest {
     }
 
     private Member saveMember(String suffix) {
-        return memberRepository.save(new Member(TEST_EMAIL_PREFIX + suffix + "@example.com", "password123"));
+        return memberRepository.save(new Member(TEST_EMAIL_PREFIX + suffix + "@example.com", Password.encode("password123")));
     }
 
     private Product saveProduct(String suffix) {

@@ -2,6 +2,7 @@ package gift.order.service;
 
 import gift.member.domain.Member;
 import gift.member.domain.MemberRepository;
+import gift.member.vo.Password;
 import gift.order.domain.Order;
 import gift.order.domain.OrderRepository;
 import gift.order.dto.OrderCommand;
@@ -86,7 +87,7 @@ class CreateOrderServiceTest {
     }
 
     private Member kakaoMember(int point) {
-        Member member = new Member("order-event@example.com", "password123");
+        Member member = new Member("order-event@example.com", Password.encode("password123"));
         setId(member, MEMBER_ID);
         member.chargePoint(point);
         member.updateKakaoAccessToken("kakao-access-token");

@@ -96,6 +96,7 @@ Mockito `verify(times/never)`를 사용한다.
 | `aead396` | UseCase command record가 `usecase` 패키지에 있어 포트와 입력 DTO의 역할이 섞여 보였다. | `CategoryCommand`, `ProductCommand`, `OptionCommand`, `MemberCredentialsCommand`, `KakaoAuthorizationCodeCommand`, `WishCommand`, `OrderCommand`를 각 도메인의 `dto` 패키지로 이동했다. |
 | `a79a46b` | 관리자 상품 화면이 `AdminProductController`에서 `ProductRepository`, `CategoryRepository`를 직접 호출해 트랜잭션 경계와 책임이 컨트롤러에 남아 있었다. | 관리자 상품 목록/단건/생성/수정/삭제/폼 카테고리 조회 UseCase 구현체를 추가하고, 컨트롤러는 UseCase만 호출하도록 변경했다. `AdminProductUseCaseServiceTest`로 실제 DB 기반 동작을 고정했다. |
 | `이번 변경` | Member 물리 삭제가 `wish.member_id`, `orders.member_id` FK에 막히거나 DB 예외로 노출될 수 있었다. | `member.deleted` 컬럼을 추가하고 삭제 UseCase는 소프트 삭제만 수행한다. Wish/Order row는 유지하며, 삭제된 회원은 관리자 목록/단건 조회/일반 로그인/Kakao 로그인/토큰 인증에서 제외한다. |
+| `이번 변경` | 일반 회원가입, 관리자 회원 생성/수정, 일반 로그인 흐름이 비밀번호를 평문으로 저장하고 평문 문자열 비교로 검증했다. | `Password` VO가 고정 BCrypt encoder로 인코딩한 값을 `value()`로 들고 UseCase에 전달되게 했다. `Member` 생성/수정은 `Password`를 받아 내부에서 인코딩 값을 저장하고, 로그인은 `Password.matches(...)`로 검증한다. |
 
 ## 식별된 정책 변경
 
@@ -110,6 +111,7 @@ Mockito `verify(times/never)`를 사용한다.
 | `Product/Wish` | Product 삭제 시 `wish.product_id -> product.id` FK가 삭제를 막았다. | Product Aggregate 삭제 정책이 Wish Aggregate에 묶였다. | Product 삭제는 Wish를 수정/삭제하지 않는다. `wish.product_id` FK를 제거하고, Product가 없는 Wish는 목록에서 미노출한다. | `V4__Remove_wish_product_foreign_key.sql`, `ProductUseCaseServiceTest`, `WishServiceTest` |
 | `Wish/Order` | 주문 생성 후 해당 상품의 Wish를 제거해야 한다고 봤다. | Wish는 반복 구매 후보일 수 있어 주문과 동시에 삭제하면 사용자의 재구매 의도가 사라진다. | 주문 생성은 Wish를 삭제하지 않는다. | `OrderServiceTest` |
 | `Member` | 중복 회원가입은 `existsByEmail` 사전 체크로 충분하다고 봤다. | 동시 요청에서는 사전 체크 이후 저장 시점에 unique 제약 위반이 발생할 수 있다. | `member.email` unique 제약을 유지하고, 저장 단계의 중복 이메일 실패도 `400 Bad Request`로 변환한다. | `905d6b1`, `MemberServiceTest`, `MemberApiTest` |
+| `Member` | 회원 비밀번호를 문자열 값으로 UseCase에 전달하고 그대로 저장/비교해도 된다고 봤다. | 회원가입/관리자 생성/수정에서 비밀번호가 평문으로 저장되고 로그인도 평문 문자열 비교에 의존했다. | 컨트롤러가 `Password.encode(raw)`로 `Password` VO를 만들고, `Password.value()`는 저장할 BCrypt 인코딩 값이다. encoder는 `Password` 내부의 고정 객체로만 사용한다. `Member`는 `Password`를 넘겨받아 내부에서 저장값을 꺼내고, 로그인은 `Password.matches(...)`로 검증한다. | `PasswordTest`, `MemberContractTest`, `MemberServiceTest`, `MemberApiTest`, `AdminMemberApiTest` |
 | `Member/Order` | 주문 포인트 차감은 현재 포인트를 읽고 메모리에서 차감한 뒤 저장했다. | 동시 주문에서 같은 회원 포인트를 동시에 차감하면 optimistic lock 실패나 MySQL deadlock/lock 실패가 발생할 수 있다. | `Member.version`으로 포인트 차감 충돌을 감지하고, 트랜잭션 경계의 `ConcurrencyFailureException`은 공통 API 처리에서 `409 Conflict`로 변환한다. | `Member.version`, `OrderConcurrencyServiceTest`, `GlobalExceptionHandler`, `V5__Add_member_version.sql` |
 | `Member/Wish/Order` | 회원 삭제는 `member` row를 물리 삭제한다고 봤다. | Wish/Order가 `member_id` FK로 회원 row를 참조하므로 물리 삭제는 FK 실패를 만들고, 주문 이력의 소유자 값도 사라진다. | 회원 삭제는 소프트 삭제다. `member.deleted=true`로 표시하고 Wish/Order는 그대로 둔다. 삭제된 회원은 관리자 목록/단건 조회, 일반 로그인, Kakao 로그인, 토큰 인증에서 제외한다. 같은 이메일 재가입은 기존 unique 제약 때문에 계속 거절된다. | `V10__Add_member_deleted.sql`, `MemberContractTest`, `MemberServiceTest`, `AdminMemberApiTest`, `MemberApiTest`, `KakaoAuthServiceTest`, `KakaoAuthApiTest`, `WishApiTest` |
 | `Order` | Order가 `Option` 객체를 직접 참조했다. | 주문 이력이 Product/Option 생명주기와 DB FK에 묶이고, afterCommit 메시지 전송 시 lazy/entity 상태에 기대게 된다. | Order는 별도 이력 루트로 보고 `productId`, `optionId`, `memberId` 값과 주문 당시 상품명/옵션명/단가/이미지 URL 스냅샷만 저장한다. | `OrderContractTest`, `OrderServiceTest`, `CreateOrderService`, `V8__Store_order_product_and_option_ids.sql`, `V9__Add_order_snapshot_fields.sql` |
@@ -225,6 +227,7 @@ Mockito `verify(times/never)`를 사용한다.
 - [x] Wish 또는 주문 이력이 있는 Member 삭제 정책을 정의한다: 물리 삭제하지 않고 `deleted=true`로 표시한다.
 - [x] 삭제된 Member는 관리자 목록/단건 조회, 일반 로그인, Kakao 로그인, 토큰 인증에서 제외한다.
 - [x] 이번까지의 리팩터링/정책 변경에서는 권한 체크 동작을 변경하지 않았다는 범위를 명시한다.
+- [x] 일반 회원가입, 관리자 회원 생성/수정, 일반 로그인에서 비밀번호 평문 저장/비교 문제를 해결한다.
 - [ ] 동시 포인트 충전/차감과 Member 삭제 동작을 검토한다.
 
 ### Wish

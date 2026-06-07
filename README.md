@@ -210,6 +210,7 @@ Current policy:
 - Keep the database unique constraint on `member.email`.
 - Mark `Member.email` as unique in the JPA mapping.
 - Convert duplicate-email persistence failures into `400 Bad Request` with `Email is already registered.`.
+- Encode normal member passwords with BCrypt before storing them. `Password` owns the fixed BCrypt encoder, `Password.value()` is the encoded value passed through member UseCase services, and `Member` extracts that value when creating or updating the stored password. Login compares the submitted password through `Password.matches(...)` instead of plain string equality.
 
 ## Runtime Verification Notes
 

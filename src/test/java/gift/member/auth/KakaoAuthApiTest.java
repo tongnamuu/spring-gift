@@ -2,6 +2,7 @@ package gift.member.auth;
 
 import gift.member.domain.Member;
 import gift.member.domain.MemberRepository;
+import gift.member.vo.Password;
 import gift.support.AbstractMysqlApiTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -97,7 +98,7 @@ class KakaoAuthApiTest extends AbstractMysqlApiTest {
     @Test
     void kakaoCallbackReturnsBadRequestWhenMemberIsDeleted() {
         String email = TEST_EMAIL_PREFIX + "deleted@example.com";
-        Member member = memberRepository.save(new Member(email, "password123"));
+        Member member = memberRepository.save(new Member(email, Password.encode("password123")));
         member.markDeleted();
         memberRepository.save(member);
         kakaoLoginClient.prepare("kakao-api-access-token-deleted", email);

@@ -1,4 +1,6 @@
 package gift.member.dto;
 
-public record MemberCredentialsCommand(String email, String password) {
+import gift.member.vo.Password;
+
+public record MemberCredentialsCommand(String email, Password password) {
 }

@@ -4,8 +4,8 @@ import gift.member.auth.JwtProvider;
 import gift.member.auth.TokenResponse;
 import gift.member.domain.Member;
 import gift.member.domain.MemberRepository;
-import gift.member.usecase.auth.LoginMemberUseCase;
 import gift.member.dto.MemberCredentialsCommand;
+import gift.member.usecase.auth.LoginMemberUseCase;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,7 +27,7 @@ public class LoginMemberService implements LoginMemberUseCase {
         Member member = memberRepository.findByEmailAndDeletedFalse(command.email())
             .orElseThrow(() -> new IllegalArgumentException(INVALID_LOGIN_MESSAGE));
 
-        if (member.getPassword() == null || !member.getPassword().equals(command.password())) {
+        if (member.getPassword() == null || !command.password().matches(member.getPassword())) {
             throw new IllegalArgumentException(INVALID_LOGIN_MESSAGE);
         }
 

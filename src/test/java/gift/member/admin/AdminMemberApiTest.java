@@ -2,6 +2,7 @@ package gift.member.admin;
 
 import gift.member.domain.Member;
 import gift.member.domain.MemberRepository;
+import gift.member.vo.Password;
 import gift.order.domain.Order;
 import gift.order.domain.OrderRepository;
 import gift.product.entity.Option;
@@ -67,7 +68,7 @@ class AdminMemberApiTest extends AbstractMysqlApiTest {
 
     @Test
     void memberListDisplaysMembers() {
-        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "list@example.com", "password123"));
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "list@example.com", Password.encode("password123")));
 
         ResponseEntity<String> response = restTemplate.getForEntity("/admin/members", String.class);
 
@@ -86,13 +87,15 @@ class AdminMemberApiTest extends AbstractMysqlApiTest {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(memberRepository.findByEmail(email)).isPresent();
+        Member member = memberRepository.findByEmail(email).orElseThrow();
+        assertThat(member.getPassword()).isNotEqualTo("password123");
+        assertThat(Password.encode("password123").matches(member.getPassword())).isTrue();
     }
 
     @Test
     void createMemberShowsDuplicateEmailError() {
         String email = TEST_EMAIL_PREFIX + "duplicate@example.com";
-        memberRepository.save(new Member(email, "password123"));
+        memberRepository.save(new Member(email, Password.encode("password123")));
 
         ResponseEntity<String> response = restTemplate.postForEntity(
             "/admin/members",
@@ -107,7 +110,7 @@ class AdminMemberApiTest extends AbstractMysqlApiTest {
 
     @Test
     void editMemberPersistsChanges() {
-        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "before-edit@example.com", "password123"));
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "before-edit@example.com", Password.encode("password123")));
         String updatedEmail = TEST_EMAIL_PREFIX + "after-edit@example.com";
 
         ResponseEntity<String> response = restTemplate.postForEntity(
@@ -119,12 +122,13 @@ class AdminMemberApiTest extends AbstractMysqlApiTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         Member updated = memberRepository.findById(member.getId()).orElseThrow();
         assertThat(updated.getEmail()).isEqualTo(updatedEmail);
-        assertThat(updated.getPassword()).isEqualTo("updated-password");
+        assertThat(updated.getPassword()).isNotEqualTo("updated-password");
+        assertThat(Password.encode("updated-password").matches(updated.getPassword())).isTrue();
     }
 
     @Test
     void chargePointPersistsPoint() {
-        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "charge@example.com", "password123"));
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "charge@example.com", Password.encode("password123")));
 
         ResponseEntity<String> response = restTemplate.postForEntity(
             "/admin/members/" + member.getId() + "/charge-point",
@@ -138,7 +142,7 @@ class AdminMemberApiTest extends AbstractMysqlApiTest {
 
     @Test
     void deleteMemberMarksMemberDeletedWithoutReferences() {
-        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "delete@example.com", "password123"));
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "delete@example.com", Password.encode("password123")));
 
         ResponseEntity<String> response = restTemplate.exchange(
             "/admin/members/{id}/delete",
@@ -156,7 +160,7 @@ class AdminMemberApiTest extends AbstractMysqlApiTest {
 
     @Test
     void deleteMemberMarksMemberDeletedAndKeepsWishesWhenWishesReferenceMember() {
-        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "wish-delete@example.com", "password123"));
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "wish-delete@example.com", Password.encode("password123")));
         Product product = saveProductWithOption("wish-delete");
         Wish wish = wishRepository.save(new Wish(member.getId(), product.getId()));
 
@@ -177,7 +181,7 @@ class AdminMemberApiTest extends AbstractMysqlApiTest {
 
     @Test
     void deleteMemberMarksMemberDeletedAndKeepsOrderHistory() {
-        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "order-delete@example.com", "password123"));
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "order-delete@example.com", Password.encode("password123")));
         Product product = saveProductWithOption("order-delete");
         Option option = product.getOptions().getFirst();
         Order order = orderRepository.save(new Order(

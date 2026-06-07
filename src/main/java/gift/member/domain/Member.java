@@ -1,5 +1,6 @@
 package gift.member.domain;
 
+import gift.member.vo.Password;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -37,18 +38,18 @@ public class Member {
     protected Member() {
     }
 
-    public Member(String email, String password) {
+    public Member(String email, Password password) {
         this.email = email;
-        this.password = password;
+        this.password = password.value();
     }
 
     public Member(String email) {
         this.email = email;
     }
 
-    public void update(String email, String password) {
+    public void update(String email, Password password) {
         this.email = email;
-        this.password = password;
+        this.password = password.value();
     }
 
     public void updateKakaoAccessToken(String kakaoAccessToken) {

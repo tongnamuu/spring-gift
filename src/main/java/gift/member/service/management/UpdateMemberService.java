@@ -3,6 +3,7 @@ package gift.member.service.management;
 import gift.member.domain.Member;
 import gift.member.domain.MemberRepository;
 import gift.member.usecase.management.UpdateMemberUseCase;
+import gift.member.vo.Password;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,7 +19,7 @@ public class UpdateMemberService implements UpdateMemberUseCase {
 
     @Override
     @Transactional
-    public Member execute(Long id, String email, String password) {
+    public Member execute(Long id, String email, Password password) {
         Member member = memberRepository.findByIdAndDeletedFalse(id)
             .orElseThrow(() -> new IllegalArgumentException(MEMBER_NOT_FOUND_MESSAGE));
         member.update(email, password);

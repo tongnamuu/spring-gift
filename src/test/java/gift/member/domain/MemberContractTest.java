@@ -1,5 +1,6 @@
 package gift.member.domain;
 
+import gift.member.vo.Password;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -8,21 +9,21 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class MemberContractTest {
     @Test
     void memberStartsWithZeroPoint() {
-        Member member = new Member("member-contract@example.com", "password123");
+        Member member = new Member("member-contract@example.com", Password.encode("password123"));
 
         assertThat(member.getPoint()).isZero();
     }
 
     @Test
     void memberStartsActive() {
-        Member member = new Member("member-contract@example.com", "password123");
+        Member member = new Member("member-contract@example.com", Password.encode("password123"));
 
         assertThat(member.isDeleted()).isFalse();
     }
 
     @Test
     void memberCanBeMarkedDeleted() {
-        Member member = new Member("member-contract@example.com", "password123");
+        Member member = new Member("member-contract@example.com", Password.encode("password123"));
 
         member.markDeleted();
 
@@ -31,7 +32,7 @@ class MemberContractTest {
 
     @Test
     void memberCanChargeAndDeductPoint() {
-        Member member = new Member("member-contract@example.com", "password123");
+        Member member = new Member("member-contract@example.com", Password.encode("password123"));
 
         member.chargePoint(3000);
         member.deductPoint(1000);
@@ -41,7 +42,7 @@ class MemberContractTest {
 
     @Test
     void chargePointRequiresPositiveAmount() {
-        Member member = new Member("member-contract@example.com", "password123");
+        Member member = new Member("member-contract@example.com", Password.encode("password123"));
 
         assertThatThrownBy(() -> member.chargePoint(0))
             .isInstanceOf(IllegalArgumentException.class)
@@ -50,7 +51,7 @@ class MemberContractTest {
 
     @Test
     void deductPointRequiresPositiveAmount() {
-        Member member = new Member("member-contract@example.com", "password123");
+        Member member = new Member("member-contract@example.com", Password.encode("password123"));
 
         assertThatThrownBy(() -> member.deductPoint(0))
             .isInstanceOf(IllegalArgumentException.class)
@@ -59,7 +60,7 @@ class MemberContractTest {
 
     @Test
     void deductPointRejectsInsufficientPoint() {
-        Member member = new Member("member-contract@example.com", "password123");
+        Member member = new Member("member-contract@example.com", Password.encode("password123"));
         member.chargePoint(1000);
 
         assertThatThrownBy(() -> member.deductPoint(1001))
@@ -69,7 +70,7 @@ class MemberContractTest {
 
     @Test
     void memberKeepsKakaoAccessTokenAsMemberState() {
-        Member member = new Member("member-contract@example.com", "password123");
+        Member member = new Member("member-contract@example.com", Password.encode("password123"));
 
         member.updateKakaoAccessToken("kakao-access-token");
 

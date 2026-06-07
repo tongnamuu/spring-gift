@@ -3,6 +3,7 @@ package gift.member.service.management;
 import gift.member.domain.Member;
 import gift.member.domain.MemberRepository;
 import gift.member.usecase.management.CreateMemberUseCase;
+import gift.member.vo.Password;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,7 +20,7 @@ public class CreateMemberService implements CreateMemberUseCase {
 
     @Override
     @Transactional
-    public Member execute(String email, String password) {
+    public Member execute(String email, Password password) {
         if (memberRepository.existsByEmail(email)) {
             throw new IllegalArgumentException(DUPLICATE_EMAIL_MESSAGE);
         }
