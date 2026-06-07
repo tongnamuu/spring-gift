@@ -24,7 +24,7 @@ public class LoginMemberService implements LoginMemberUseCase {
     @Override
     @Transactional(readOnly = true)
     public TokenResponse execute(MemberCredentialsCommand command) {
-        Member member = memberRepository.findByEmail(command.email())
+        Member member = memberRepository.findByEmailAndDeletedFalse(command.email())
             .orElseThrow(() -> new IllegalArgumentException(INVALID_LOGIN_MESSAGE));
 
         if (member.getPassword() == null || !member.getPassword().equals(command.password())) {

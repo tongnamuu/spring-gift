@@ -14,6 +14,22 @@ class MemberContractTest {
     }
 
     @Test
+    void memberStartsActive() {
+        Member member = new Member("member-contract@example.com", "password123");
+
+        assertThat(member.isDeleted()).isFalse();
+    }
+
+    @Test
+    void memberCanBeMarkedDeleted() {
+        Member member = new Member("member-contract@example.com", "password123");
+
+        member.markDeleted();
+
+        assertThat(member.isDeleted()).isTrue();
+    }
+
+    @Test
     void memberCanChargeAndDeductPoint() {
         Member member = new Member("member-contract@example.com", "password123");
 

@@ -19,7 +19,7 @@ public class UpdateMemberService implements UpdateMemberUseCase {
     @Override
     @Transactional
     public Member execute(Long id, String email, String password) {
-        Member member = memberRepository.findById(id)
+        Member member = memberRepository.findByIdAndDeletedFalse(id)
             .orElseThrow(() -> new IllegalArgumentException(MEMBER_NOT_FOUND_MESSAGE));
         member.update(email, password);
         return memberRepository.save(member);

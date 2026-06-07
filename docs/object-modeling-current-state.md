@@ -69,9 +69,11 @@ classDiagram
         String password
         String kakaoAccessToken
         int point
+        boolean deleted
         Long version
         update(email, password)
         updateKakaoAccessToken(token)
+        markDeleted()
         chargePoint(amount)
         deductPoint(amount)
     }
@@ -112,7 +114,7 @@ classDiagram
 | `Category` | 카테고리 속성 보관, 전체 필드 수정 | `Product.categoryId` 값으로 참조 |
 | `Product` | 상품 속성 보관, 카테고리 id 교체, 옵션 컬렉션 소유 | `Category`는 `categoryId` 값으로 참조, `Option`과 `OneToMany` |
 | `Option` | 옵션명/재고 보관, 재고 차감 규칙 수행 | `Product`와 `ManyToOne` |
-| `Member` | 이메일/비밀번호/Kakao 토큰/포인트 보관, 포인트 충전/차감 규칙 수행 | `Wish`, `Order`는 객체 참조 대신 `memberId` 사용 |
+| `Member` | 이메일/비밀번호/Kakao 토큰/포인트/삭제 여부 보관, 포인트 충전/차감과 소프트 삭제 규칙 수행 | `Wish`, `Order`는 객체 참조 대신 `memberId` 사용 |
 | `Wish` | 회원의 관심 상품 항목 보관, 소유자 확인 | `memberId`, `productId` 원시 FK |
 | `Order` | 주문 당시 상품/옵션/주문자 id, 상품명, 옵션명, 단가, 이미지, 수량, 메시지, 주문 시각 보관 | `productId`, `optionId`, `memberId` 값 참조 |
 
@@ -135,7 +137,7 @@ DB에서는 `member_id` FK만 갖고 `product_id`는 FK가 아니며, JPA 모델
 | Object | Can exist without parent? | Required parent or owner | Current delete constraint | Lifecycle note |
 | --- | --- | --- | --- | --- |
 | `Category` | Yes | none | DB FK는 없고 Product가 삭제된 category id를 값으로 보관할 수 있다. | 상품이 없어도 카테고리는 존재할 수 있는 독립 기준 데이터이다. |
-| `Member` | Yes | none | Referenced `Wish` 또는 `Order`가 있으면 DB FK가 삭제를 막는다. | 회원은 독립적으로 가입/생성되지만 위시와 주문의 소유자가 된다. |
+| `Member` | Yes | none | 물리 삭제는 `Wish` 또는 `Order` FK가 막을 수 있다. 현재 삭제 UseCase는 row를 삭제하지 않고 `deleted=true`로 표시한다. | 회원은 독립적으로 가입/생성되지만 위시와 주문의 소유자가 된다. 삭제된 회원은 관리자 목록, 단건 조회, 로그인, Kakao 로그인, 토큰 인증에서 제외된다. |
 | `Product` | Yes, after valid `categoryId` is provided | none as aggregate parent | `Option`은 Product 컬렉션의 orphan이고, Wish/Order는 Product 삭제를 DB FK로 막지 않는다. | Product는 Aggregate root이고 Option을 소유한다. Category는 객체 참조가 아니라 id 값이다. |
 | `Option` | No | `Product` | Order FK가 없으므로 주문 이력은 옵션 삭제를 DB에서 막지 않는다. | 옵션은 상품의 선택지/재고 단위라 상품 없이 존재할 수 없다. 주문된 옵션도 Product Aggregate 규칙상 삭제 가능하면 삭제되고, Order는 기존 option id와 스냅샷을 유지한다. |
 | `Wish` | Yes, after valid `memberId` and `productId` are provided | none as aggregate parent | none from other current tables | 위시는 별도 루트로 두고 회원/상품은 객체 참조가 아니라 id 값으로 연결한다. DB FK는 회원 row 존재만 요구하며, Product 삭제 후에는 product row가 없는 Wish가 남을 수 있다. |
@@ -329,8 +331,8 @@ repository를 직접 호출하지 않고 관리자 상품 UseCase에 위임한�
 
 1. `MemberController`는 이메일/비밀번호 가입과 로그인을 처리한다.
 2. 가입 성공 또는 로그인 성공 시 `JwtProvider`가 JWT를 발급한다.
-3. `AuthenticationResolver`는 Authorization 헤더에서 JWT를 읽고 이메일로 `Member`를 조회한다.
-4. Kakao 로그인은 `KakaoAuthController`가 Kakao 토큰과 사용자 정보를 받아 회원을 생성하거나 갱신한 뒤 JWT를 발급한다.
+3. `AuthenticationResolver`는 Authorization 헤더에서 JWT를 읽고 이메일로 삭제되지 않은 `Member`를 조회한다.
+4. Kakao 로그인은 `KakaoAuthController`가 Kakao 토큰과 사용자 정보를 받아 삭제되지 않은 회원을 생성하거나 갱신한 뒤 JWT를 발급한다.
 
 ### Wish
 

@@ -19,7 +19,7 @@ public class ChargeMemberPointService implements ChargeMemberPointUseCase {
     @Override
     @Transactional
     public Member execute(Long id, int amount) {
-        Member member = memberRepository.findById(id)
+        Member member = memberRepository.findByIdAndDeletedFalse(id)
             .orElseThrow(() -> new IllegalArgumentException(MEMBER_NOT_FOUND_MESSAGE));
         member.chargePoint(amount);
         return memberRepository.save(member);

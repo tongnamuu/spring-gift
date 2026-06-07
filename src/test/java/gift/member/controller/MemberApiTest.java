@@ -86,6 +86,24 @@ class MemberApiTest extends AbstractMysqlApiTest {
     }
 
     @Test
+    void registerReturnsBadRequestWhenEmailBelongsToDeletedMember() {
+        MemberRequest request = new MemberRequest(TEST_EMAIL_PREFIX + "deleted-register@example.com", "password123");
+        Member member = memberRepository.save(new Member(request.email(), request.password()));
+        member.markDeleted();
+        memberRepository.save(member);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/api/members/register",
+            request,
+            String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isEqualTo("Email is already registered.");
+        assertThat(countMembersByEmail(request.email())).isEqualTo(1L);
+    }
+
+    @Test
     void concurrentDuplicateRegisterReturnsBadRequest() throws Exception {
         MemberRequest request = new MemberRequest(TEST_EMAIL_PREFIX + "concurrent-duplicate@example.com", "password123");
 
@@ -142,6 +160,23 @@ class MemberApiTest extends AbstractMysqlApiTest {
         ResponseEntity<String> response = restTemplate.postForEntity(
             "/api/members/login",
             new MemberRequest(TEST_EMAIL_PREFIX + "missing@example.com", "password123"),
+            String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isEqualTo("Invalid email or password.");
+    }
+
+    @Test
+    void loginReturnsBadRequestWhenMemberIsDeleted() {
+        String email = TEST_EMAIL_PREFIX + "deleted-login@example.com";
+        Member member = memberRepository.save(new Member(email, "password123"));
+        member.markDeleted();
+        memberRepository.save(member);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/api/members/login",
+            new MemberRequest(email, "password123"),
             String.class
         );
 

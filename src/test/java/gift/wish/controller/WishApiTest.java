@@ -70,6 +70,22 @@ class WishApiTest extends AbstractMysqlApiTest {
     }
 
     @Test
+    void getWishesReturnsUnauthorizedForDeletedMemberToken() {
+        Member member = saveMember("deleted-token");
+        member.markDeleted();
+        memberRepository.save(member);
+
+        ResponseEntity<String> response = restTemplate.exchange(
+            "/api/wishes",
+            HttpMethod.GET,
+            authorizedEntity(member),
+            String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
     void getWishesReturnsOnlyAuthenticatedMembersWishes() {
         Member member = saveMember("list");
         Member other = saveMember("list-other");

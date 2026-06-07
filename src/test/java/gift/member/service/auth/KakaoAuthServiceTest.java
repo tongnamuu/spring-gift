@@ -20,6 +20,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Import(KakaoAuthServiceTest.KakaoAuthTestConfig.class)
 @TestPropertySource(properties = {
@@ -89,6 +90,23 @@ class KakaoAuthServiceTest extends AbstractMysqlServiceTest {
         assertThat(member.getId()).isEqualTo(existing.getId());
         assertThat(member.getPassword()).isEqualTo("password123");
         assertThat(member.getKakaoAccessToken()).isEqualTo("kakao-access-token-updated");
+        assertThat(countMembersByEmail(email)).isEqualTo(1L);
+    }
+
+    @Test
+    void loginWithKakaoRejectsDeletedMember() {
+        String email = TEST_EMAIL_PREFIX + "deleted@example.com";
+        Member member = memberRepository.save(new Member(email, "password123"));
+        member.markDeleted();
+        memberRepository.save(member);
+        kakaoLoginClient.prepare("kakao-access-token-deleted", email);
+
+        assertThatThrownBy(() -> loginWithKakaoUseCase.execute(
+            new KakaoAuthorizationCodeCommand("authorization-code")
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("회원이 존재하지 않습니다.");
+
         assertThat(countMembersByEmail(email)).isEqualTo(1L);
     }
 

@@ -19,6 +19,6 @@ public class GetMembersService implements GetMembersUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<Member> execute() {
-        return memberRepository.findAll();
+        return memberRepository.findByDeletedFalse();
     }
 }

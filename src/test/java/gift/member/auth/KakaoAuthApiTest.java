@@ -94,6 +94,23 @@ class KakaoAuthApiTest extends AbstractMysqlApiTest {
         assertThat(member.getKakaoAccessToken()).isEqualTo("kakao-api-access-token");
     }
 
+    @Test
+    void kakaoCallbackReturnsBadRequestWhenMemberIsDeleted() {
+        String email = TEST_EMAIL_PREFIX + "deleted@example.com";
+        Member member = memberRepository.save(new Member(email, "password123"));
+        member.markDeleted();
+        memberRepository.save(member);
+        kakaoLoginClient.prepare("kakao-api-access-token-deleted", email);
+
+        ResponseEntity<String> response = restTemplate.getForEntity(
+            "/api/auth/kakao/callback?code=authorization-code",
+            String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isEqualTo("회원이 존재하지 않습니다.");
+    }
+
     private void deleteTestMembers() {
         jdbcTemplate.update("delete from member where email like ?", TEST_EMAIL_PREFIX + "%");
     }

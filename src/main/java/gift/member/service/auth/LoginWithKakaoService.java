@@ -12,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class LoginWithKakaoService implements LoginWithKakaoUseCase {
+    private static final String DELETED_MEMBER_MESSAGE = "회원이 존재하지 않습니다.";
+
     private final KakaoLoginClient kakaoLoginClient;
     private final MemberRepository memberRepository;
     private final JwtProvider jwtProvider;
@@ -34,10 +36,18 @@ public class LoginWithKakaoService implements LoginWithKakaoUseCase {
         String email = kakaoUser.email();
 
         Member member = memberRepository.findByEmail(email)
+            .map(this::rejectDeletedMember)
             .orElseGet(() -> new Member(email));
         member.updateKakaoAccessToken(kakaoToken.accessToken());
         Member saved = memberRepository.save(member);
 
         return new TokenResponse(jwtProvider.createToken(saved.getEmail()));
+    }
+
+    private Member rejectDeletedMember(Member member) {
+        if (member.isDeleted()) {
+            throw new IllegalArgumentException(DELETED_MEMBER_MESSAGE);
+        }
+        return member;
     }
 }

@@ -28,6 +28,9 @@ public class Member {
 
     private int point;
 
+    @Column(nullable = false)
+    private boolean deleted;
+
     @Version
     private Long version;
 
@@ -50,6 +53,10 @@ public class Member {
 
     public void updateKakaoAccessToken(String kakaoAccessToken) {
         this.kakaoAccessToken = kakaoAccessToken;
+    }
+
+    public void markDeleted() {
+        this.deleted = true;
     }
 
     public void chargePoint(int amount) {
@@ -92,5 +99,9 @@ public class Member {
 
     public Long getVersion() {
         return version;
+    }
+
+    public boolean isDeleted() {
+        return deleted;
     }
 }

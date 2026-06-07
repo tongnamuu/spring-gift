@@ -4,6 +4,11 @@ import gift.member.auth.JwtProvider;
 import gift.member.auth.TokenResponse;
 import gift.member.domain.Member;
 import gift.member.domain.MemberRepository;
+import gift.order.domain.Order;
+import gift.order.domain.OrderRepository;
+import gift.product.entity.Option;
+import gift.product.entity.Product;
+import gift.product.repository.ProductRepository;
 import gift.member.usecase.management.ChargeMemberPointUseCase;
 import gift.member.usecase.management.CreateMemberUseCase;
 import gift.member.usecase.management.DeleteMemberUseCase;
@@ -12,6 +17,10 @@ import gift.member.usecase.management.GetMembersUseCase;
 import gift.member.usecase.auth.LoginMemberUseCase;
 import gift.member.dto.MemberCredentialsCommand;
 import gift.member.usecase.management.UpdateMemberUseCase;
+import gift.wish.domain.Wish;
+import gift.wish.domain.WishRepository;
+import gift.category.domain.Category;
+import gift.category.domain.CategoryRepository;
 import gift.support.AbstractMysqlServiceTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,6 +43,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class MemberServiceTest extends AbstractMysqlServiceTest {
     private static final String TEST_EMAIL_PREFIX = "member-service-";
+    private static final String TEST_CATEGORY_PREFIX = "member-service-category-";
+    private static final String TEST_PRODUCT_PREFIX = "ms-";
     private static final String DUPLICATE_EMAIL_MESSAGE = "Email is already registered.";
     private static final String MEMBER_NOT_FOUND_MESSAGE = "회원이 존재하지 않습니다.";
 
@@ -63,6 +74,18 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
 
     @Autowired
     private MemberRepository memberRepository;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
+    private WishRepository wishRepository;
+
+    @Autowired
+    private OrderRepository orderRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -102,6 +125,20 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
     void createMemberRejectsDuplicateEmail() {
         String email = TEST_EMAIL_PREFIX + "duplicate@example.com";
         memberRepository.save(new Member(email, "password123"));
+
+        assertThatThrownBy(() -> createMemberUseCase.execute(email, "another-password"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage(DUPLICATE_EMAIL_MESSAGE);
+
+        assertThat(countMembersByEmail(email)).isEqualTo(1L);
+    }
+
+    @Test
+    void createMemberRejectsDeletedMemberEmail() {
+        String email = TEST_EMAIL_PREFIX + "deleted-register@example.com";
+        Member member = memberRepository.save(new Member(email, "password123"));
+        member.markDeleted();
+        memberRepository.save(member);
 
         assertThatThrownBy(() -> createMemberUseCase.execute(email, "another-password"))
             .isInstanceOf(IllegalArgumentException.class)
@@ -181,6 +218,18 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
     }
 
     @Test
+    void loginMemberRejectsDeletedMember() {
+        String email = TEST_EMAIL_PREFIX + "deleted-login@example.com";
+        Member member = memberRepository.save(new Member(email, "password123"));
+        member.markDeleted();
+        memberRepository.save(member);
+
+        assertThatThrownBy(() -> loginMemberUseCase.execute(new MemberCredentialsCommand(email, "password123")))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Invalid email or password.");
+    }
+
+    @Test
     void chargeMemberPointUpdatesPersistedPoint() {
         String email = TEST_EMAIL_PREFIX + "charge@example.com";
         Member member = memberRepository.save(new Member(email, "password123"));
@@ -234,6 +283,30 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
     }
 
     @Test
+    void getMembersDoesNotReturnDeletedMembers() {
+        Member active = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "active-list@example.com", "password123"));
+        Member deleted = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "deleted-list@example.com", "password123"));
+        deleted.markDeleted();
+        memberRepository.save(deleted);
+
+        List<Long> ids = getMembersUseCase.execute().stream()
+            .map(Member::getId)
+            .toList();
+
+        assertThat(ids).contains(active.getId());
+        assertThat(ids).doesNotContain(deleted.getId());
+    }
+
+    @Test
+    void getMemberReturnsEmptyWhenMemberIsDeleted() {
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "deleted-get@example.com", "password123"));
+        member.markDeleted();
+        memberRepository.save(member);
+
+        assertThat(getMemberUseCase.execute(member.getId())).isEmpty();
+    }
+
+    @Test
     void updateMemberUpdatesEmailAndPassword() {
         Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "before-update@example.com", "password123"));
         String updatedEmail = TEST_EMAIL_PREFIX + "after-update@example.com";
@@ -261,12 +334,77 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
     }
 
     @Test
-    void deleteMemberRemovesMemberWithoutReferences() {
+    void updateMemberRejectsDeletedMember() {
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "deleted-update@example.com", "password123"));
+        member.markDeleted();
+        memberRepository.save(member);
+
+        assertThatThrownBy(() -> updateMemberUseCase.execute(
+            member.getId(),
+            TEST_EMAIL_PREFIX + "after-deleted-update@example.com",
+            "updated-password"
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage(MEMBER_NOT_FOUND_MESSAGE);
+    }
+
+    @Test
+    void chargeMemberPointRejectsDeletedMember() {
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "deleted-charge@example.com", "password123"));
+        member.markDeleted();
+        memberRepository.save(member);
+
+        assertThatThrownBy(() -> chargeMemberPointUseCase.execute(member.getId(), 3000))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage(MEMBER_NOT_FOUND_MESSAGE);
+    }
+
+    @Test
+    void deleteMemberMarksMemberDeletedWithoutReferences() {
         Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "delete@example.com", "password123"));
 
         deleteMemberUseCase.execute(member.getId());
 
-        assertThat(memberRepository.existsById(member.getId())).isFalse();
+        assertThat(memberRepository.existsById(member.getId())).isTrue();
+        assertThat(isDeleted(member.getId())).isTrue();
+        assertThat(getMemberUseCase.execute(member.getId())).isEmpty();
+    }
+
+    @Test
+    void deleteMemberMarksMemberDeletedAndKeepsWishesWhenWishesReferenceMember() {
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "wish-delete@example.com", "password123"));
+        Product product = saveProductWithOption("wish-delete");
+        Wish wish = wishRepository.save(new Wish(member.getId(), product.getId()));
+
+        deleteMemberUseCase.execute(member.getId());
+
+        assertThat(memberRepository.existsById(member.getId())).isTrue();
+        assertThat(isDeleted(member.getId())).isTrue();
+        assertThat(wishRepository.existsById(wish.getId())).isTrue();
+    }
+
+    @Test
+    void deleteMemberMarksMemberDeletedAndKeepsOrderHistory() {
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "order-delete@example.com", "password123"));
+        Product product = saveProductWithOption("order-delete");
+        Option option = product.getOptions().getFirst();
+        Order order = orderRepository.save(new Order(
+            product.getId(),
+            option.getId(),
+            member.getId(),
+            product.getName(),
+            option.getName(),
+            product.getPrice(),
+            product.getImageUrl(),
+            1,
+            "message"
+        ));
+
+        deleteMemberUseCase.execute(member.getId());
+
+        assertThat(memberRepository.existsById(member.getId())).isTrue();
+        assertThat(isDeleted(member.getId())).isTrue();
+        assertThat(orderRepository.existsById(order.getId())).isTrue();
     }
 
     private List<CreateMemberResult> createMemberConcurrently(String email, int requestCount) throws Exception {
@@ -319,8 +457,49 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
         );
     }
 
+    private boolean isDeleted(Long memberId) {
+        return jdbcTemplate.queryForObject(
+            "select deleted from member where id = ?",
+            Boolean.class,
+            memberId
+        );
+    }
+
+    private Product saveProductWithOption(String suffix) {
+        Category category = categoryRepository.save(new Category(
+            TEST_CATEGORY_PREFIX + suffix,
+            "#123456",
+            "https://example.com/member-category-" + suffix + ".png",
+            "member service category " + suffix
+        ));
+        Product product = new Product(
+            TEST_PRODUCT_PREFIX + suffix,
+            1_000,
+            "https://example.com/member-product-" + suffix + ".png",
+            category.getId()
+        );
+        product.addOption("option-" + suffix, 10);
+        Product saved = productRepository.save(product);
+        productRepository.flush();
+        return saved;
+    }
+
     private void deleteTestMembers() {
+        jdbcTemplate.update(
+            "delete from orders where member_id in (select id from member where email like ?)",
+            TEST_EMAIL_PREFIX + "%"
+        );
+        jdbcTemplate.update(
+            "delete from wish where member_id in (select id from member where email like ?)",
+            TEST_EMAIL_PREFIX + "%"
+        );
         jdbcTemplate.update("delete from member where email like ?", TEST_EMAIL_PREFIX + "%");
+        jdbcTemplate.update(
+            "delete from options where product_id in (select id from product where name like ?)",
+            TEST_PRODUCT_PREFIX + "%"
+        );
+        jdbcTemplate.update("delete from product where name like ?", TEST_PRODUCT_PREFIX + "%");
+        jdbcTemplate.update("delete from category where name like ?", TEST_CATEGORY_PREFIX + "%");
     }
 
     private record CreateMemberResult(boolean succeeded, Throwable failure) {

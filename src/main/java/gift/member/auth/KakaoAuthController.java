@@ -6,6 +6,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -40,6 +41,11 @@ public class KakaoAuthController {
     @GetMapping(path = "/callback")
     public ResponseEntity<TokenResponse> callback(@RequestParam("code") String code) {
         return ResponseEntity.ok(loginWithKakaoUseCase.execute(toCommand(code)));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<String> handleIllegalArgument(IllegalArgumentException e) {
+        return ResponseEntity.badRequest().body(e.getMessage());
     }
 
     private KakaoAuthorizationCodeCommand toCommand(String code) {

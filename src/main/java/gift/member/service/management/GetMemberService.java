@@ -19,6 +19,6 @@ public class GetMemberService implements GetMemberUseCase {
     @Override
     @Transactional(readOnly = true)
     public Optional<Member> execute(Long id) {
-        return memberRepository.findById(id);
+        return memberRepository.findByIdAndDeletedFalse(id);
     }
 }

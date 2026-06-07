@@ -13,6 +13,8 @@ Spring Boot gift service for practicing production-like execution, automated ver
 - API tests now cover category deletion policy, admin product missing-category display, member registration/login behavior, and wish workflows.
 - Category, Product including admin product screens, Wish, Member auth/admin flows, and Order creation/listing now run through UseCase/service boundaries.
 - Member code is grouped under `gift.member`; auth/admin/controller/domain are separated, and service/usecase classes are further grouped into `auth` and `management` workflows.
+- Member deletion is a soft delete. Deleted members remain in the database for Wish/Order FK integrity, but admin lists, member lookup, login, Kakao login, and token-based authentication ignore deleted members.
+- Deleted member emails cannot be registered again; the existing unique email constraint keeps the email reserved.
 - Wish is treated as a separate aggregate root and stores `memberId`/`productId` without direct `Member` or `Product` object references.
 - Product is the aggregate root for option stock changes. Order creation updates option quantity through `Product.subtractOptionQuantity(...)`, and Product/Member optimistic versions guard stock and point concurrency.
 - Option is not a separate aggregate root. Option creation/deletion goes through Product, only root repositories are used for writes, and read APIs use dedicated `JdbcTemplate` query objects.
@@ -57,7 +59,7 @@ Most remaining Flyway foreign keys are defined without `ON DELETE CASCADE`. In M
 | `Category` | `Product.categoryId` value reference only; no DB FK after `V3__Remove_product_category_foreign_key.sql`. | Products can keep a category id whose category row was deleted. | Allow category deletion and display missing category rows as `미분류 카테고리`. |
 | `Product` | `options.product_id -> product.id`; `wish.product_id`, `orders.product_id`, and `orders.option_id` are value references only. | Wishes and orders can keep product or option ids whose rows were deleted. | Delete products without changing wishes or orders; wish lists hide missing products, and orders keep immutable ids plus creation-time snapshots. |
 | `Option` | Owned by `Product`; no order FK after `V8__Store_order_product_and_option_ids.sql`. | Orders can keep an option id whose option row was deleted or later changed. | Ordered options can be deleted when Product aggregate rules allow it; order history keeps the original option id and option-name snapshot. |
-| `Member` | `wish.member_id -> member.id`, `orders.member_id -> member.id` | Deleting a member with wishes or orders will fail at the database level. | Define whether wishes are cleaned up, but reject deletion when order history exists. |
+| `Member` | `wish.member_id -> member.id`, `orders.member_id -> member.id` | Physical deletion with wishes or orders fails at the database level. | Use soft delete: set `member.deleted = true`, keep Wish/Order rows, and exclude deleted members from admin lists, lookup, login, Kakao login, and token authentication. |
 | `Wish` | None currently identified. | Wish deletion is the lowest FK risk, but ownership validation must remain explicit. | Allow deletion only by the owning member. |
 | `Order` | No current delete API. | No delete behavior has been defined. | Decide whether orders are immutable history. |
 
@@ -130,8 +132,8 @@ Data flow:
 
 1. `POST /api/members/login` receives `MemberRequest(email, password)`.
 2. `MemberController` validates the request and converts it to `MemberCredentialsCommand`.
-3. `LoginMemberService` loads the member with `MemberRepository.findByEmail(email)`.
-4. If the member is missing, has no password, or the password does not match, the service throws `IllegalArgumentException("Invalid email or password.")`.
+3. `LoginMemberService` loads the active member with `MemberRepository.findByEmailAndDeletedFalse(email)`.
+4. If the member is missing, deleted, has no password, or the password does not match, the service throws `IllegalArgumentException("Invalid email or password.")`.
 5. If the password matches, `LoginMemberService` creates a JWT with `JwtProvider.createToken(member.getEmail())`.
 6. The API returns `TokenResponse(token)`.
 
@@ -158,10 +160,11 @@ Data flow:
 4. `LoginWithKakaoService` calls `KakaoLoginClient.requestAccessToken(code)`.
 5. `KakaoLoginRestClient` exchanges the code with Kakao using `KakaoLoginProperties`.
 6. `LoginWithKakaoService` calls `KakaoLoginClient.requestUserInfo(accessToken)` and reads the Kakao account email.
-7. If `MemberRepository.findByEmail(email)` is empty, the service creates `new Member(email)` as a Kakao member without a local password.
-8. The service stores the Kakao access token with `member.updateKakaoAccessToken(accessToken)` and saves the member.
-9. The service creates a service JWT with `JwtProvider.createToken(member.getEmail())`.
-10. The API returns `TokenResponse(token)`.
+7. If `MemberRepository.findByEmail(email)` returns a deleted member, the service rejects the login with `회원이 존재하지 않습니다.`.
+8. If `MemberRepository.findByEmail(email)` is empty, the service creates `new Member(email)` as a Kakao member without a local password.
+9. The service stores the Kakao access token with `member.updateKakaoAccessToken(accessToken)` and saves the member.
+10. The service creates a service JWT with `JwtProvider.createToken(member.getEmail())`.
+11. The API returns `TokenResponse(token)`.
 
 #### Kakao 로그인
 
@@ -183,16 +186,18 @@ Data flow:
 2. Kakao redirects back to `GET /api/auth/kakao/callback?code=...`.
 3. `KakaoAuthController` converts the authorization code to `KakaoAuthorizationCodeCommand`.
 4. `LoginWithKakaoService` exchanges the authorization code for a Kakao access token and user email through `KakaoLoginClient`.
-5. If `MemberRepository.findByEmail(email)` returns an existing member, the service reuses that member instead of creating a new one.
-6. The service updates the stored Kakao access token with the latest token.
-7. The service creates a new service JWT with `JwtProvider.createToken(member.getEmail())`.
-8. The API returns `TokenResponse(token)`.
+5. If `MemberRepository.findByEmail(email)` returns a deleted member, the service rejects the login with `회원이 존재하지 않습니다.`.
+6. If it returns an active existing member, the service reuses that member instead of creating a new one.
+7. The service updates the stored Kakao access token with the latest token.
+8. The service creates a new service JWT with `JwtProvider.createToken(member.getEmail())`.
+9. The API returns `TokenResponse(token)`.
 
 Current behavior:
 
 - `POST /api/members/register` returns `200 OK` with a JWT when a new email is registered.
 - Sequential duplicate registration returns `400 Bad Request` with `Email is already registered.`.
 - Concurrent duplicate registration also returns `400 Bad Request` with `Email is already registered.` for losing requests.
+- Registration with a soft-deleted member email also returns `400 Bad Request` with `Email is already registered.`.
 - Login with a registered email and matching password returns `200 OK` with a JWT.
 - Login with a missing member or wrong password returns `400 Bad Request` with `Invalid email or password.`.
 - Invalid email format on registration returns `400 Bad Request`.
@@ -216,7 +221,7 @@ Earlier runtime verification on the local application confirmed that FK failures
 | `DELETE /api/products/2/options/3` | `500 Internal Server Error` | `DataIntegrityViolationException` from `SQLIntegrityConstraintViolationException` | Historical: `orders.option_id -> options.id` (`orders_ibfk_1`), removed by `V8__Store_order_product_and_option_ids.sql` |
 | `POST /admin/members/2/delete` | `500 Internal Server Error` | `DataIntegrityViolationException` from `SQLIntegrityConstraintViolationException` | `orders.member_id -> member.id` (`orders_ibfk_2`) |
 
-Application startup itself succeeds against local MySQL. The remaining startup warnings are Flyway's MySQL 8.4 support warning and Spring's default `open-in-view` warning.
+Member deletion now uses `V10__Add_member_deleted.sql` and marks the member as deleted instead of physically deleting the row, so Wish/Order FK rows can remain intact. Application startup itself succeeds against local MySQL. The remaining startup warnings are Flyway's MySQL 8.4 support warning and Spring's default `open-in-view` warning.
 
 ## Commit Prompt Hook
 
