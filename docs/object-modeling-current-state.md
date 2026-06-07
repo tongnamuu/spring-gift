@@ -1,8 +1,8 @@
 # Object Modeling Current State
 
-이 문서는 현재 코드 기준의 객체 모델과 책임 배치를 정리한다. Category,
-Product/Option, Wish, Member 회원가입, Order 생성/목록은 UseCase 서비스로 일부
-이동했고, 남은 흐름은 아직 컨트롤러와 리포지토리 조합이 섞여 있다.
+이 문서는 현재 코드 기준의 객체 모델과 책임 배치를 정리한다. Category, Product/Option,
+Wish, Member 인증/관리자 흐름, Order 생성/목록은 UseCase 서비스 경계로 이동했다.
+남은 작업은 새 문제를 발견할 때마다 객체별 정책과 동시성 규칙을 보강하는 쪽에 가깝다.
 
 ## Package Structure
 
@@ -287,15 +287,16 @@ Aggregate를 조회한 뒤 응답으로 조립한다. 관리자 Thymeleaf 컨트
 | Package | UseCase interfaces |
 | --- | --- |
 | `category` | `GetCategoriesUseCase`, `CreateCategoryUseCase`, `UpdateCategoryUseCase`, `DeleteCategoryUseCase` |
-| `product` | `GetProductsUseCase`, `GetProductUseCase`, `CreateProductUseCase`, `UpdateProductUseCase`, `DeleteProductUseCase`, 관리자 상품용 인터페이스 |
-| `option` | `GetOptionsUseCase`, `CreateOptionUseCase`, `DeleteOptionUseCase` |
-| `member` | 등록/로그인, Kakao 로그인, 관리자 회원 조회/생성/수정/삭제/포인트 충전 인터페이스 |
+| `product` | 상품: `GetProductsUseCase`, `GetProductUseCase`, `CreateProductUseCase`, `UpdateProductUseCase`, `DeleteProductUseCase`; 옵션: `GetOptionsUseCase`, `CreateOptionUseCase`, `DeleteOptionUseCase`; 관리자 상품: `GetAdminProductsUseCase`, `GetAdminProductUseCase`, `CreateAdminProductUseCase`, `UpdateAdminProductUseCase`, `DeleteAdminProductUseCase`, `GetProductFormCategoriesUseCase` |
+| `member/auth` | `RegisterMemberUseCase`, `LoginMemberUseCase`, `LoginWithKakaoUseCase` |
+| `member/management` | `GetMembersUseCase`, `GetMemberUseCase`, `CreateMemberUseCase`, `UpdateMemberUseCase`, `DeleteMemberUseCase`, `ChargeMemberPointUseCase` |
 | `wish` | `GetWishesUseCase`, `AddWishUseCase`, `RemoveWishUseCase` |
 | `order` | `GetOrdersUseCase`, `CreateOrderUseCase` |
 
-UseCase 연결은 객체별로 진행 중이다. 현재 Category, Product 일반 API와 관리자 상품
+UseCase 연결 상태는 객체별로 추적한다. 현재 Category, Product 일반 API와 관리자 상품
 흐름, Member 회원가입/로그인/관리자 흐름, Wish 추가/목록/삭제, Order 생성/목록 흐름은
-UseCase 서비스를 통해 실행된다.
+UseCase 서비스를 통해 실행된다. 새로 발견되는 컨트롤러 직접 로직은 문제 해결 항목에
+먼저 기록한 뒤 구조 해결로 옮긴다.
 
 ## Main Object Flows
 
@@ -381,8 +382,8 @@ repository를 직접 호출하지 않고 관리자 상품 UseCase에 위임한�
 
 ## Current Structural Observations
 
-- 컨트롤러가 인증, 조회, 검증, 도메인 변경, 저장, 응답 변환을 함께 수행하던 구조를 객체별로 UseCase 서비스로 옮기는 중이다.
-- Category, Product 일부 흐름, Member 회원가입, Wish 추가/목록/삭제, Order 생성/목록은 UseCase 서비스에 연결되어 있다.
+- 컨트롤러가 인증, 조회, 검증, 도메인 변경, 저장, 응답 변환을 함께 수행하던 구조는 객체별 UseCase 서비스로 대부분 이동했다.
+- Category, Product 일반 API와 관리자 상품 화면, Member 회원가입/로그인/Kakao/관리자 흐름, Wish 추가/목록/삭제, Order 생성/목록은 UseCase 서비스에 연결되어 있다.
 - `CreateOrderService.execute`에는 메서드 단위 트랜잭션 경계가 있다.
 - 주문 생성 흐름에서 Product 루트 재고 차감, Member 포인트 차감, Order 저장이 같은 트랜잭션에서 실행된다.
 - 주문 생성 후 `saveAndFlush`로 중간 flush를 강제하지 않고 트랜잭션 경계에서 변경을 반영한다.

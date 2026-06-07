@@ -52,15 +52,19 @@ Mockito `verify(times/never)`를 사용한다.
 | `8ade19c` | Member 인증 Cucumber feature를 현재 API 계약에 맞게 갱신했다. | 블랙박스 Member 명세를 현재 동작과 맞췄다. |
 | `2003461` | Category 패키지를 controller, domain, service, usecase로 분리했다. | Category 패키지 구조를 리팩터링 방향과 맞췄다. |
 | `81ebc15` | Order 생성 UseCase 서비스를 도입했다. | 주문 생성 로직을 컨트롤러에서 서비스로 옮기고 포인트/재고 동시성 문제를 서비스 테스트로 드러냈다. |
-| `현재 작업` | 옵션 재고 변경을 Product 루트 경유로 변경했다. | Product Aggregate root 기준으로 옵션 재고 변경과 낙관적 락 경계를 맞췄다. |
-| `현재 작업` | Order가 Product/Option을 객체가 아니라 id 값과 주문 당시 스냅샷으로 보관하게 했다. | 주문 이력을 별도 루트로 두고 Product/Option 삭제/변경 정책과 주문 이력 표시를 분리했다. |
-| `현재 작업` | Order 목록 조회를 `JdbcTemplate` query DAO와 `GetOrdersUseCase`로 분리했다. | 객체 관계 변경이 조회 성능이나 N+1 문제로 이어지지 않게 주문 조회를 명시적 SQL 읽기 모델로 고정했다. |
-| `현재 작업` | Order 패키지를 controller, domain, service, usecase로 분리했다. | 주문 생성/목록, Order 이력 루트, Kakao 메시지 부수효과의 책임 위치를 명확히 했다. |
-| `현재 작업` | Kakao 메시지를 Spring 이벤트 기반 afterCommit 비동기 listener와 `KakaoMessageSender` 포트로 이동했다. | 외부 부수효과가 DB 트랜잭션 성공 전 발생하지 않고, API 응답 시간을 막지 않도록 했다. 이벤트 발행 여부는 Mockito `verify(times/never)`로, 외부 전송은 fake sender로 검증한다. |
-| `현재 작업` | `OptionRepository`를 제거하고 옵션 쓰기 흐름을 Product 루트 저장으로 통일했다. | Aggregate root repository만 허용하는 기준을 Product/Option에 적용했다. |
-| `현재 작업` | Product 단건/목록 조회 응답에 옵션 목록을 포함하고 `ProductQueryDao`/`OptionQueryDao`를 도입했다. | Product/Option 객체 관계 변경이 조회 API 성능이나 N+1 문제에 영향을 주지 않도록 SQL 읽기 모델을 분리했다. |
-| `현재 작업` | 조회 UseCase 구현체와 query DAO를 각 도메인의 `query` 패키지로 이동했다. | command 서비스가 query 객체를 사용하지 않도록 패키지 경계를 분리했다. |
-| `현재 작업` | Category/Product/Option/Wish/Order 입력을 controller request DTO에서 UseCase command/VO로 분리했다. | 단순 요청값 검증은 컨트롤러에서 끝내고, 트랜잭션 서비스는 검증 완료 입력과 DB 상태 의존 규칙만 다루게 했다. |
+| `3542836` | 옵션 재고 변경을 Product 루트 경유로 변경했다. | Product Aggregate root 기준으로 옵션 재고 변경과 낙관적 락 경계를 맞췄다. |
+| `3542836` | Order가 Product/Option을 객체가 아니라 id 값과 주문 당시 스냅샷으로 보관하게 했다. | 주문 이력을 별도 루트로 두고 Product/Option 삭제/변경 정책과 주문 이력 표시를 분리했다. |
+| `2ef5190` | Order 목록 조회를 `JdbcTemplate` query DAO와 `GetOrdersUseCase`로 분리했다. | 객체 관계 변경이 조회 성능이나 N+1 문제로 이어지지 않게 주문 조회를 명시적 SQL 읽기 모델로 고정했다. |
+| `2ef5190` | Order 패키지를 controller, domain, service, usecase로 분리했다. | 주문 생성/목록, Order 이력 루트, Kakao 메시지 부수효과의 책임 위치를 명확히 했다. |
+| `264bed7` | Kakao 메시지를 Spring 이벤트 기반 afterCommit 비동기 listener와 `KakaoMessageSender` 포트로 이동했다. | 외부 부수효과가 DB 트랜잭션 성공 전 발생하지 않고, API 응답 시간을 막지 않도록 했다. 이벤트 발행 여부는 Mockito `verify(times/never)`로, 외부 전송은 fake sender로 검증한다. |
+| `9a0331d` | `OptionRepository`를 제거하고 옵션 쓰기 흐름을 Product 루트 저장으로 통일했다. | Aggregate root repository만 허용하는 기준을 Product/Option에 적용했다. |
+| `9a0331d` | Product 단건/목록 조회 응답에 옵션 목록을 포함하고 `ProductQueryDao`/`OptionQueryDao`를 도입했다. | Product/Option 객체 관계 변경이 조회 API 성능이나 N+1 문제에 영향을 주지 않도록 SQL 읽기 모델을 분리했다. |
+| `68154b9` | 조회 UseCase 구현체와 query DAO를 각 도메인의 `query` 패키지로 이동했다. | command 서비스가 query 객체를 사용하지 않도록 패키지 경계를 분리했다. |
+| `a1e12f6`, `aead396` | Category/Product/Option/Wish/Order 입력을 controller request DTO에서 UseCase command/VO로 분리하고 command record를 `dto` 패키지로 이동했다. | 단순 요청값 검증은 컨트롤러에서 끝내고, 트랜잭션 서비스는 검증 완료 입력과 DB 상태 의존 규칙만 다루게 했다. |
+| `99bf84c` | Member 회원가입/로그인/관리자 흐름을 UseCase 서비스로 추출했다. | Member 컨트롤러에서 repository와 인증 로직을 제거하고 메서드 단위 트랜잭션 경계를 서비스에 둔다. |
+| `f5dafcd` | Member 관련 auth/admin/controller/domain 패키지와 service/usecase workflow를 정리했다. | Member 인증과 관리자 흐름의 소유 도메인과 클래스 책임을 명확히 했다. |
+| `27425e4` | Kakao 로그인 UseCase 이름과 Kakao 인가 URI provider 역할을 정리했다. | 사용자가 Kakao로 로그인한다는 핵심 UseCase와 OAuth 보조 컴포넌트를 분리했다. |
+| `a79a46b` | 관리자 상품 화면의 목록/단건/생성/수정/삭제/폼 카테고리 조회 UseCase 서비스를 추가했다. | 관리자 상품 컨트롤러의 repository 직접 호출을 제거하고 트랜잭션 경계를 서비스로 이동했다. |
 
 ## 완료된 문제 해결
 
@@ -71,24 +75,24 @@ Mockito `verify(times/never)`를 사용한다.
 | `c72940d` | Category 생명주기가 Product에 과하게 묶여 있었다. | Category 삭제를 Product와 무관하게 허용하고, Category row가 없는 Product는 목록에서 `미분류 카테고리`로 표시하도록 했다. |
 | `905d6b1` | 동시 중복 회원가입이 `500 Internal Server Error`로 드러날 수 있었다. | 중복 이메일 저장 실패를 `400 Bad Request`와 `Email is already registered.` 메시지로 변환했다. |
 | `81ebc15` | 동시 주문에서 회원 포인트 차감 실패가 DB lock/deadlock 예외로 노출될 수 있었다. | `Member.version`을 추가하고 포인트 낙관적 락 충돌을 도메인 실패로 변환했다. |
-| `현재 작업` | 동시 주문에서 같은 옵션 재고가 초과 판매될 수 있었다. | `Product.version`과 `update_dt`를 추가하고 옵션 재고 차감을 Product 루트 메서드로 수행하게 했다. |
-| `현재 작업` | 주문 생성 서비스가 `saveAndFlush`로 중간 flush를 강제하고 낙관적 락 예외를 트랜잭션 내부에서 변환했다. | 중간 flush를 제거하고 트랜잭션 경계에서 발생한 동시성 실패를 공통 API 예외 처리에서 `409 Conflict`로 변환한다. |
-| `현재 작업` | 주문 이력이 `Option` 엔티티와 DB FK에 묶여 있어 옵션 삭제 정책이 주문 FK에 의해 결정됐다. | `orders.product_id`를 추가하고 `orders.option_id` FK를 제거해 주문 이력은 생성 당시 id 값과 스냅샷을 보관하게 했다. |
-| `현재 작업` | Order 목록이 현재 Product/Option을 조회하면 과거 주문의 상품명, 옵션명, 가격이 바뀌어 보일 수 있었다. | Order에 상품명, 옵션명, 단가, 이미지 URL 스냅샷을 저장하고 목록 응답은 이 값을 사용한다. |
-| `현재 작업` | Kakao 메시지가 주문 트랜잭션 성공 전에 전송되거나 afterCommit 동기 처리로 응답 시간을 지연시킬 수 있었다. | 메시지에 필요한 스냅샷을 이벤트로 발행하고 `@TransactionalEventListener(AFTER_COMMIT)` + `@Async` listener에서 `KakaoMessageSender` 포트를 통해 best-effort로 전송한다. |
-| `현재 작업` | 주문 생성 후 Wish를 장바구니처럼 정리해야 한다는 이전 가정이 반복 구매 상품 정책과 맞지 않았다. | 주문 성공 후에도 Wish는 유지한다. Wish는 반복 구매 후보이고 Order는 구매 이력이다. |
-| `현재 작업` | 두 옵션을 동시에 삭제하면 둘 다 성공해 등록된 모든 옵션이 제거될 수 있었다. | `Product.version` 경계에서 삭제 충돌을 감지하고, 옵션이 등록된 상품의 마지막 옵션 삭제를 금지하는 규칙을 서비스/API 테스트로 고정했다. 상품 생성 시점에는 옵션 없이 존재할 수 있다. 마지막 옵션 삭제 메시지는 `옵션이 1개인 상품은 옵션을 삭제할 수 없습니다.`이다. |
-| `현재 작업` | 주문으로 옵션 재고를 차감하는 동시에 같은 Product의 옵션이 삭제될 수 있다. | 두 트랜잭션이 같은 Product version을 읽으면 하나만 커밋되고 다른 하나는 optimistic lock failure로 실패한다는 서비스 테스트를 추가했다. |
-| `현재 작업` | 단순 요청값 검증이 트랜잭션 서비스 내부 또는 HTTP request DTO 의존 경계에 남아 있을 수 있었다. | 컨트롤러가 Bean Validation 이후 `ProductName`/`OptionName` VO와 각 도메인 command를 생성하고, UseCase 서비스는 command만 받는다. 존재 확인, 중복, 소유권, 재고/포인트 부족처럼 DB 또는 Aggregate 상태에 의존하는 규칙만 트랜잭션 내부에 둔다. |
-| `현재 작업` | `GET /api/orders` 미인증 요청이 컨트롤러 인증 로직 전에 `400 Bad Request`로 처리됐다. | Order API도 Authorization header를 optional로 받고 인증 resolver 결과가 없으면 `401 Unauthorized`를 반환하게 했다. `OrderApiTest`로 생성, 목록, 실패, 인증, Wish 유지 계약을 고정했다. |
-| `현재 작업` | `MemberController.login()`이 `MemberRepository`와 `JwtProvider`를 직접 사용했다. | `LoginMemberUseCase` 구현체를 추가하고 로그인 성공/실패를 `MemberServiceTest`로 고정했다. 컨트롤러는 회원가입/로그인 UseCase만 호출한다. |
-| `현재 작업` | Member 포인트 규칙과 관리자 포인트 충전 흐름이 컨트롤러/repository 직접 호출에 기대고 있었다. | `MemberContractTest`로 포인트 충전/차감 규칙을 고정하고 `ChargeMemberPointUseCase` 구현체를 추가했다. 관리자 포인트 충전 endpoint는 해당 UseCase를 호출한다. |
-| `현재 작업` | 관리자 회원 생성/목록/수정/삭제가 `AdminMemberController`에서 repository를 직접 호출했다. | 관리자 회원 생성/목록/단건 조회/수정/삭제 UseCase 구현체를 추가하고 `AdminMemberApiTest`와 `MemberServiceTest`로 고정했다. |
-| `현재 작업` | Member 오류 메시지가 `Member not found. id=...`처럼 DB 식별자를 노출할 수 있었다. | Member 사용자 노출 오류 메시지는 `회원이 존재하지 않습니다.`로 고정했다. 다른 도메인의 `id=` 노출 메시지는 공통 오류 메시지 정책 정리 작업에서 추가 검토한다. |
-| `현재 작업` | 일반 회원가입/로그인과 Kakao 로그인/자동 회원가입 흐름의 입력 경계가 달랐고, `KakaoAuthController`가 외부 client와 repository를 직접 호출했다. | 일반 인증 UseCase는 `MemberCredentialsCommand`, Kakao callback UseCase는 `KakaoAuthorizationCodeCommand`를 받게 했다. `KakaoLoginClient`를 외부 API 포트로 분리하고 실제 REST 구현체와 fake 테스트 구현을 나눴다. |
-| `현재 작업` | `auth`, `member`, `admin`이 최상위/동일 패키지에 섞여 있어 Member 관련 인증과 관리자 흐름의 소유 도메인이 불분명했고, `service`/`usecase`도 클래스가 너무 많아 한 패키지에서 목적을 읽기 어려웠다. | `gift.member` 아래 `auth`, `admin`, `controller`, `domain`을 분리하고, `service`/`usecase`는 `auth`와 `management` workflow 하위 패키지로 정리했다. 테스트 패키지도 같은 구조로 맞췄다. |
-| `현재 작업` | UseCase command record가 `usecase` 패키지에 있어 포트와 입력 DTO의 역할이 섞여 보였다. | `CategoryCommand`, `ProductCommand`, `OptionCommand`, `MemberCredentialsCommand`, `KakaoAuthorizationCodeCommand`, `WishCommand`, `OrderCommand`를 각 도메인의 `dto` 패키지로 이동했다. |
-| `현재 작업` | 관리자 상품 화면이 `AdminProductController`에서 `ProductRepository`, `CategoryRepository`를 직접 호출해 트랜잭션 경계와 책임이 컨트롤러에 남아 있었다. | 관리자 상품 목록/단건/생성/수정/삭제/폼 카테고리 조회 UseCase 구현체를 추가하고, 컨트롤러는 UseCase만 호출하도록 변경했다. `AdminProductUseCaseServiceTest`로 실제 DB 기반 동작을 고정했다. |
+| `3542836` | 동시 주문에서 같은 옵션 재고가 초과 판매될 수 있었다. | `Product.version`과 `update_dt`를 추가하고 옵션 재고 차감을 Product 루트 메서드로 수행하게 했다. |
+| `3542836` | 주문 생성 서비스가 `saveAndFlush`로 중간 flush를 강제하고 낙관적 락 예외를 트랜잭션 내부에서 변환했다. | 중간 flush를 제거하고 트랜잭션 경계에서 발생한 동시성 실패를 공통 API 예외 처리에서 `409 Conflict`로 변환한다. |
+| `3542836` | 주문 이력이 `Option` 엔티티와 DB FK에 묶여 있어 옵션 삭제 정책이 주문 FK에 의해 결정됐다. | `orders.product_id`를 추가하고 `orders.option_id` FK를 제거해 주문 이력은 생성 당시 id 값과 스냅샷을 보관하게 했다. |
+| `3542836` | Order 목록이 현재 Product/Option을 조회하면 과거 주문의 상품명, 옵션명, 가격이 바뀌어 보일 수 있었다. | Order에 상품명, 옵션명, 단가, 이미지 URL 스냅샷을 저장하고 목록 응답은 이 값을 사용한다. |
+| `264bed7` | Kakao 메시지가 주문 트랜잭션 성공 전에 전송되거나 afterCommit 동기 처리로 응답 시간을 지연시킬 수 있었다. | 메시지에 필요한 스냅샷을 이벤트로 발행하고 `@TransactionalEventListener(AFTER_COMMIT)` + `@Async` listener에서 `KakaoMessageSender` 포트를 통해 best-effort로 전송한다. |
+| `2ef5190` | 주문 생성 후 Wish를 장바구니처럼 정리해야 한다는 이전 가정이 반복 구매 상품 정책과 맞지 않았다. | 주문 성공 후에도 Wish는 유지한다. Wish는 반복 구매 후보이고 Order는 구매 이력이다. |
+| `c6dd158` | 두 옵션을 동시에 삭제하면 둘 다 성공해 등록된 모든 옵션이 제거될 수 있었다. | `Product.version` 경계에서 삭제 충돌을 감지하고, 옵션이 등록된 상품의 마지막 옵션 삭제를 금지하는 규칙을 서비스/API 테스트로 고정했다. 상품 생성 시점에는 옵션 없이 존재할 수 있다. 마지막 옵션 삭제 메시지는 `옵션이 1개인 상품은 옵션을 삭제할 수 없습니다.`이다. |
+| `924a49c` | 주문으로 옵션 재고를 차감하는 동시에 같은 Product의 옵션이 삭제될 수 있다. | 두 트랜잭션이 같은 Product version을 읽으면 하나만 커밋되고 다른 하나는 optimistic lock failure로 실패한다는 서비스 테스트를 추가했다. |
+| `1ccf7bb`, `a1e12f6` | 단순 요청값 검증이 트랜잭션 서비스 내부 또는 HTTP request DTO 의존 경계에 남아 있을 수 있었다. | 컨트롤러가 Bean Validation 이후 `ProductName`/`OptionName` VO와 각 도메인 command를 생성하고, UseCase 서비스는 command만 받는다. 존재 확인, 중복, 소유권, 재고/포인트 부족처럼 DB 또는 Aggregate 상태에 의존하는 규칙만 트랜잭션 내부에 둔다. |
+| `e23c994` | `GET /api/orders` 미인증 요청이 컨트롤러 인증 로직 전에 `400 Bad Request`로 처리됐다. | Order API도 Authorization header를 optional로 받고 인증 resolver 결과가 없으면 `401 Unauthorized`를 반환하게 했다. `OrderApiTest`로 생성, 목록, 실패, 인증, Wish 유지 계약을 고정했다. |
+| `99bf84c` | `MemberController.login()`이 `MemberRepository`와 `JwtProvider`를 직접 사용했다. | `LoginMemberUseCase` 구현체를 추가하고 로그인 성공/실패를 `MemberServiceTest`로 고정했다. 컨트롤러는 회원가입/로그인 UseCase만 호출한다. |
+| `99bf84c` | Member 포인트 규칙과 관리자 포인트 충전 흐름이 컨트롤러/repository 직접 호출에 기대고 있었다. | `MemberContractTest`로 포인트 충전/차감 규칙을 고정하고 `ChargeMemberPointUseCase` 구현체를 추가했다. 관리자 포인트 충전 endpoint는 해당 UseCase를 호출한다. |
+| `99bf84c` | 관리자 회원 생성/목록/수정/삭제가 `AdminMemberController`에서 repository를 직접 호출했다. | 관리자 회원 생성/목록/단건 조회/수정/삭제 UseCase 구현체를 추가하고 `AdminMemberApiTest`와 `MemberServiceTest`로 고정했다. |
+| `99bf84c` | Member 오류 메시지가 `Member not found. id=...`처럼 DB 식별자를 노출할 수 있었다. | Member 사용자 노출 오류 메시지는 `회원이 존재하지 않습니다.`로 고정했다. 다른 도메인의 `id=` 노출 메시지는 공통 오류 메시지 정책 정리 작업에서 추가 검토한다. |
+| `27425e4` | 일반 회원가입/로그인과 Kakao 로그인/자동 회원가입 흐름의 입력 경계가 달랐고, `KakaoAuthController`가 외부 client와 repository를 직접 호출했다. | 일반 인증 UseCase는 `MemberCredentialsCommand`, Kakao callback UseCase는 `KakaoAuthorizationCodeCommand`를 받게 했다. `KakaoLoginClient`를 외부 API 포트로 분리하고 실제 REST 구현체와 fake 테스트 구현을 나눴다. |
+| `f5dafcd` | `auth`, `member`, `admin`이 최상위/동일 패키지에 섞여 있어 Member 관련 인증과 관리자 흐름의 소유 도메인이 불분명했고, `service`/`usecase`도 클래스가 너무 많아 한 패키지에서 목적을 읽기 어려웠다. | `gift.member` 아래 `auth`, `admin`, `controller`, `domain`을 분리하고, `service`/`usecase`는 `auth`와 `management` workflow 하위 패키지로 정리했다. 테스트 패키지도 같은 구조로 맞췄다. |
+| `aead396` | UseCase command record가 `usecase` 패키지에 있어 포트와 입력 DTO의 역할이 섞여 보였다. | `CategoryCommand`, `ProductCommand`, `OptionCommand`, `MemberCredentialsCommand`, `KakaoAuthorizationCodeCommand`, `WishCommand`, `OrderCommand`를 각 도메인의 `dto` 패키지로 이동했다. |
+| `a79a46b` | 관리자 상품 화면이 `AdminProductController`에서 `ProductRepository`, `CategoryRepository`를 직접 호출해 트랜잭션 경계와 책임이 컨트롤러에 남아 있었다. | 관리자 상품 목록/단건/생성/수정/삭제/폼 카테고리 조회 UseCase 구현체를 추가하고, 컨트롤러는 UseCase만 호출하도록 변경했다. `AdminProductUseCaseServiceTest`로 실제 DB 기반 동작을 고정했다. |
 
 ## 식별된 정책 변경
 
@@ -110,7 +114,7 @@ Mockito `verify(times/never)`를 사용한다.
 
 | 분류 | 작업 | 현재 상태 |
 | --- | --- | --- |
-| 구조 해결 | 컨트롤러 로직을 하나의 API 동작당 하나의 UseCase 서비스로 계속 추출한다. | 남은 API/admin 흐름이 있는지 계속 검토한다. |
+| 구조 해결 | 컨트롤러 로직을 하나의 API 동작당 하나의 UseCase 서비스로 계속 추출한다. | 새로 발견되는 controller 직접 repository 호출이나 트랜잭션 책임을 문제로 기록한 뒤 UseCase 서비스로 옮긴다. |
 | 구조 해결 | 서비스/UseCase 메서드에 트랜잭션 경계를 추가한다. | 클래스 단위 `@Transactional`은 사용하지 않고 메서드 단위로만 선언한다. |
 | 구조 해결 | 서비스 입력 경계를 HTTP request DTO가 아니라 command/VO로 통일한다. | 단순 값 검증은 컨트롤러에서 트랜잭션 시작 전에 끝내고, 서비스는 검증 완료 입력과 상태 의존 규칙만 처리한다. |
 | 문제 해결 | FK 삭제 오류, 런타임 오류, 정책 공백을 계속 수집한다. | 새로 발견한 동작 문제는 구조 변경보다 먼저 문제 해결 항목에 기록한다. |
@@ -145,7 +149,7 @@ Mockito `verify(times/never)`를 사용한다.
 | 문제 해결 | Wish와 주문 이력이 있는 Member 삭제 정책 정의 | Member 삭제는 Wish/Order FK 위험을 가진다. |
 | 문제 해결 | 사용자 노출 오류 메시지에서 내부 id 제거 | URL 경로나 DB 식별자를 오류 본문에 반복 노출하지 않고, 내부 추적은 로그로 분리한다. |
 | 문제 해결 | 동시성 실패 API 계약을 객체별로 세분화 | Order 생성은 공통 `409 Conflict` 처리로 정리했지만, 다른 흐름의 동시성 실패 응답은 아직 검토가 필요하다. |
-| 구조 해결 | 남은 API/admin 흐름의 서비스/UseCase 추출 | 명확한 트랜잭션 경계와 도메인 동작 검증을 가능하게 한다. |
+| 구조 해결 | 새로 발견되는 controller 직접 로직의 서비스/UseCase 추출 | 명확한 트랜잭션 경계와 도메인 동작 검증을 가능하게 한다. |
 | 구조 해결 | 필요할 때만 Cucumber step definition을 실행 가능한 검증 체계로 추가 | 현재 feature 파일은 실행 테스트가 아니라 블랙박스 명세 역할이다. |
 
 ## 객체별 구현 체크리스트
