@@ -83,7 +83,7 @@ Current policy:
 
 ## Member Registration And Login
 
-Member registration has been extracted to a UseCase service. Login is still implemented directly in `MemberController`. Current API tests verify the observable behavior against the real MySQL test database.
+Member registration and login have been extracted to one-action UseCase services. Current API tests verify the observable behavior against the real MySQL test database.
 
 Current behavior:
 

@@ -1,6 +1,8 @@
 package gift.member;
 
 import gift.support.AbstractMysqlServiceTest;
+import gift.auth.JwtProvider;
+import gift.auth.TokenResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,9 +25,31 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class MemberServiceTest extends AbstractMysqlServiceTest {
     private static final String TEST_EMAIL_PREFIX = "member-service-";
     private static final String DUPLICATE_EMAIL_MESSAGE = "Email is already registered.";
+    private static final String MEMBER_NOT_FOUND_MESSAGE = "회원이 존재하지 않습니다.";
 
     @Autowired
     private CreateMemberUseCase createMemberUseCase;
+
+    @Autowired
+    private GetMembersUseCase getMembersUseCase;
+
+    @Autowired
+    private GetMemberUseCase getMemberUseCase;
+
+    @Autowired
+    private UpdateMemberUseCase updateMemberUseCase;
+
+    @Autowired
+    private DeleteMemberUseCase deleteMemberUseCase;
+
+    @Autowired
+    private LoginMemberUseCase loginMemberUseCase;
+
+    @Autowired
+    private ChargeMemberPointUseCase chargeMemberPointUseCase;
+
+    @Autowired
+    private JwtProvider jwtProvider;
 
     @Autowired
     private MemberRepository memberRepository;
@@ -116,6 +140,125 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
         assertThat(uniqueIndexCount).isPositive();
     }
 
+    @Test
+    void loginMemberReturnsTokenForRegisteredMember() {
+        String email = TEST_EMAIL_PREFIX + "login@example.com";
+        memberRepository.save(new Member(email, "password123"));
+
+        TokenResponse response = loginMemberUseCase.execute(new MemberRequest(email, "password123"));
+
+        assertThat(response.token()).isNotBlank();
+        assertThat(jwtProvider.getEmail(response.token())).isEqualTo(email);
+    }
+
+    @Test
+    void loginMemberRejectsWrongPassword() {
+        String email = TEST_EMAIL_PREFIX + "wrong-password@example.com";
+        memberRepository.save(new Member(email, "password123"));
+
+        assertThatThrownBy(() -> loginMemberUseCase.execute(new MemberRequest(email, "wrong-password")))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Invalid email or password.");
+    }
+
+    @Test
+    void loginMemberRejectsMissingMember() {
+        assertThatThrownBy(() -> loginMemberUseCase.execute(
+            new MemberRequest(TEST_EMAIL_PREFIX + "missing@example.com", "password123")
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Invalid email or password.");
+    }
+
+    @Test
+    void chargeMemberPointUpdatesPersistedPoint() {
+        String email = TEST_EMAIL_PREFIX + "charge@example.com";
+        Member member = memberRepository.save(new Member(email, "password123"));
+
+        Member charged = chargeMemberPointUseCase.execute(member.getId(), 3000);
+
+        assertThat(charged.getPoint()).isEqualTo(3000);
+        assertThat(findPoint(member.getId())).isEqualTo(3000);
+    }
+
+    @Test
+    void chargeMemberPointRejectsMissingMember() {
+        assertThatThrownBy(() -> chargeMemberPointUseCase.execute(Long.MAX_VALUE, 3000))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage(MEMBER_NOT_FOUND_MESSAGE);
+    }
+
+    @Test
+    void chargeMemberPointRejectsNonPositiveAmount() {
+        String email = TEST_EMAIL_PREFIX + "invalid-charge@example.com";
+        Member member = memberRepository.save(new Member(email, "password123"));
+
+        assertThatThrownBy(() -> chargeMemberPointUseCase.execute(member.getId(), 0))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Amount must be greater than zero.");
+    }
+
+    @Test
+    void getMembersReturnsMembers() {
+        Member first = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "list-1@example.com", "password123"));
+        Member second = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "list-2@example.com", "password123"));
+
+        List<String> emails = getMembersUseCase.execute().stream()
+            .map(Member::getEmail)
+            .toList();
+
+        assertThat(emails).contains(first.getEmail(), second.getEmail());
+    }
+
+    @Test
+    void getMemberReturnsMemberById() {
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "get@example.com", "password123"));
+
+        assertThat(getMemberUseCase.execute(member.getId()))
+            .hasValueSatisfying(found -> assertThat(found.getEmail()).isEqualTo(member.getEmail()));
+    }
+
+    @Test
+    void getMemberReturnsEmptyWhenMemberDoesNotExist() {
+        assertThat(getMemberUseCase.execute(Long.MAX_VALUE)).isEmpty();
+    }
+
+    @Test
+    void updateMemberUpdatesEmailAndPassword() {
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "before-update@example.com", "password123"));
+        String updatedEmail = TEST_EMAIL_PREFIX + "after-update@example.com";
+
+        Member updated = updateMemberUseCase.execute(member.getId(), updatedEmail, "updated-password");
+
+        assertThat(updated.getEmail()).isEqualTo(updatedEmail);
+        Map<String, Object> persisted = jdbcTemplate.queryForMap(
+            "select email, password from member where id = ?",
+            member.getId()
+        );
+        assertThat(persisted.get("email")).isEqualTo(updatedEmail);
+        assertThat(persisted.get("password")).isEqualTo("updated-password");
+    }
+
+    @Test
+    void updateMemberRejectsMissingMember() {
+        assertThatThrownBy(() -> updateMemberUseCase.execute(
+            Long.MAX_VALUE,
+            TEST_EMAIL_PREFIX + "missing-update@example.com",
+            "password123"
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage(MEMBER_NOT_FOUND_MESSAGE);
+    }
+
+    @Test
+    void deleteMemberRemovesMemberWithoutReferences() {
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "delete@example.com", "password123"));
+
+        deleteMemberUseCase.execute(member.getId());
+
+        assertThat(memberRepository.existsById(member.getId())).isFalse();
+    }
+
     private List<CreateMemberResult> createMemberConcurrently(String email, int requestCount) throws Exception {
         ExecutorService executorService = Executors.newFixedThreadPool(requestCount);
         CountDownLatch ready = new CountDownLatch(requestCount);
@@ -155,6 +298,14 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
             "select count(*) from member where email = ?",
             Long.class,
             email
+        );
+    }
+
+    private int findPoint(Long memberId) {
+        return jdbcTemplate.queryForObject(
+            "select point from member where id = ?",
+            Integer.class,
+            memberId
         );
     }
 

@@ -1,6 +1,5 @@
 package gift.member;
 
-import gift.auth.JwtProvider;
 import gift.auth.TokenResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,18 +20,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/members")
 public class MemberController {
     private final RegisterMemberUseCase registerMemberUseCase;
-    private final MemberRepository memberRepository;
-    private final JwtProvider jwtProvider;
+    private final LoginMemberUseCase loginMemberUseCase;
 
     @Autowired
     public MemberController(
         RegisterMemberUseCase registerMemberUseCase,
-        MemberRepository memberRepository,
-        JwtProvider jwtProvider
+        LoginMemberUseCase loginMemberUseCase
     ) {
         this.registerMemberUseCase = registerMemberUseCase;
-        this.memberRepository = memberRepository;
-        this.jwtProvider = jwtProvider;
+        this.loginMemberUseCase = loginMemberUseCase;
     }
 
     @PostMapping("/register")
@@ -42,15 +38,7 @@ public class MemberController {
 
     @PostMapping("/login")
     public ResponseEntity<TokenResponse> login(@Valid @RequestBody MemberRequest request) {
-        final Member member = memberRepository.findByEmail(request.email())
-            .orElseThrow(() -> new IllegalArgumentException("Invalid email or password."));
-
-        if (member.getPassword() == null || !member.getPassword().equals(request.password())) {
-            throw new IllegalArgumentException("Invalid email or password.");
-        }
-
-        final String token = jwtProvider.createToken(member.getEmail());
-        return ResponseEntity.ok(new TokenResponse(token));
+        return ResponseEntity.ok(loginMemberUseCase.execute(request));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

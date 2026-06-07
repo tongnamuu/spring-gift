@@ -18,16 +18,35 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Controller
 @RequestMapping("/admin/members")
 public class AdminMemberController {
-    private final MemberRepository memberRepository;
+    private static final String MEMBER_NOT_FOUND_MESSAGE = "회원이 존재하지 않습니다.";
+
+    private final GetMembersUseCase getMembersUseCase;
+    private final GetMemberUseCase getMemberUseCase;
+    private final CreateMemberUseCase createMemberUseCase;
+    private final UpdateMemberUseCase updateMemberUseCase;
+    private final DeleteMemberUseCase deleteMemberUseCase;
+    private final ChargeMemberPointUseCase chargeMemberPointUseCase;
 
     @Autowired
-    public AdminMemberController(MemberRepository memberRepository) {
-        this.memberRepository = memberRepository;
+    public AdminMemberController(
+        GetMembersUseCase getMembersUseCase,
+        GetMemberUseCase getMemberUseCase,
+        CreateMemberUseCase createMemberUseCase,
+        UpdateMemberUseCase updateMemberUseCase,
+        DeleteMemberUseCase deleteMemberUseCase,
+        ChargeMemberPointUseCase chargeMemberPointUseCase
+    ) {
+        this.getMembersUseCase = getMembersUseCase;
+        this.getMemberUseCase = getMemberUseCase;
+        this.createMemberUseCase = createMemberUseCase;
+        this.updateMemberUseCase = updateMemberUseCase;
+        this.deleteMemberUseCase = deleteMemberUseCase;
+        this.chargeMemberPointUseCase = chargeMemberPointUseCase;
     }
 
     @GetMapping
     public String list(Model model) {
-        model.addAttribute("members", memberRepository.findAll());
+        model.addAttribute("members", getMembersUseCase.execute());
         return "member/list";
     }
 
@@ -42,19 +61,20 @@ public class AdminMemberController {
         @RequestParam String password,
         Model model
     ) {
-        if (memberRepository.existsByEmail(email)) {
+        try {
+            createMemberUseCase.execute(email, password);
+        } catch (IllegalArgumentException e) {
             populateNewFormError(model, email, "Email is already registered.");
             return "member/new";
         }
 
-        memberRepository.save(new Member(email, password));
         return "redirect:/admin/members";
     }
 
     @GetMapping("/{id}/edit")
     public String editForm(@PathVariable Long id, Model model) {
-        final Member member = memberRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Member not found. id=" + id));
+        final Member member = getMemberUseCase.execute(id)
+            .orElseThrow(() -> new IllegalArgumentException(MEMBER_NOT_FOUND_MESSAGE));
         model.addAttribute("member", member);
         return "member/edit";
     }
@@ -65,10 +85,7 @@ public class AdminMemberController {
         @RequestParam String email,
         @RequestParam String password
     ) {
-        final Member member = memberRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Member not found. id=" + id));
-        member.update(email, password);
-        memberRepository.save(member);
+        updateMemberUseCase.execute(id, email, password);
         return "redirect:/admin/members";
     }
 
@@ -77,16 +94,13 @@ public class AdminMemberController {
         @PathVariable Long id,
         @RequestParam int amount
     ) {
-        final Member member = memberRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Member not found. id=" + id));
-        member.chargePoint(amount);
-        memberRepository.save(member);
+        chargeMemberPointUseCase.execute(id, amount);
         return "redirect:/admin/members";
     }
 
     @PostMapping("/{id}/delete")
     public String delete(@PathVariable Long id) {
-        memberRepository.deleteById(id);
+        deleteMemberUseCase.execute(id);
         return "redirect:/admin/members";
     }
 
