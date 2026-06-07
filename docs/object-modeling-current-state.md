@@ -8,10 +8,9 @@ Product/Option, Wish, Member 회원가입, Order 생성/목록은 UseCase 서비
 
 ```text
 gift
-|-- auth       JWT, Kakao OAuth 로그인, 인증 사용자 해석
 |-- category   카테고리 controller/domain/query/service/usecase
 |-- product    상품/옵션 controller/entity/dto/query/repository/service/usecase, 관리자 상품 화면
-|-- member     회원 API, 관리자 회원 화면, 회원 엔티티/DTO/리포지토리
+|-- member     회원 auth/admin/controller/domain, service/auth, service/management, usecase/auth, usecase/management
 |-- wish       위시 controller/domain/query/service/usecase
 |-- order      주문 controller/domain/query/service/usecase, Kakao 메시지 전송
 ```
@@ -286,11 +285,10 @@ Aggregate를 조회한 뒤 응답으로 조립한다. 관리자 Thymeleaf 컨트
 
 | Package | UseCase interfaces |
 | --- | --- |
-| `auth` | `GetKakaoLoginUriUseCase`, `LoginWithKakaoAuthorizationCodeUseCase` |
 | `category` | `GetCategoriesUseCase`, `CreateCategoryUseCase`, `UpdateCategoryUseCase`, `DeleteCategoryUseCase` |
 | `product` | `GetProductsUseCase`, `GetProductUseCase`, `CreateProductUseCase`, `UpdateProductUseCase`, `DeleteProductUseCase`, 관리자 상품용 인터페이스 |
 | `option` | `GetOptionsUseCase`, `CreateOptionUseCase`, `DeleteOptionUseCase` |
-| `member` | 등록/로그인, 관리자 회원 조회/생성/수정/삭제/포인트 충전 인터페이스 |
+| `member` | 등록/로그인, Kakao 로그인 URI/callback, 관리자 회원 조회/생성/수정/삭제/포인트 충전 인터페이스 |
 | `wish` | `GetWishesUseCase`, `AddWishUseCase`, `RemoveWishUseCase` |
 | `order` | `GetOrdersUseCase`, `CreateOrderUseCase` |
 

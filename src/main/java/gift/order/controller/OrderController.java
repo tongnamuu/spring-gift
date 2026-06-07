@@ -1,6 +1,6 @@
 package gift.order.controller;
 
-import gift.auth.AuthenticationResolver;
+import gift.member.auth.AuthenticationResolver;
 import gift.order.usecase.CreateOrderUseCase;
 import gift.order.usecase.GetOrdersUseCase;
 import gift.order.usecase.OrderCommand;

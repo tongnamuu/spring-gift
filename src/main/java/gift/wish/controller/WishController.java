@@ -1,6 +1,6 @@
 package gift.wish.controller;
 
-import gift.auth.AuthenticationResolver;
+import gift.member.auth.AuthenticationResolver;
 import gift.wish.service.WishAccessDeniedException;
 import gift.wish.usecase.AddWishResult;
 import gift.wish.usecase.AddWishUseCase;

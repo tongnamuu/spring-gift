@@ -85,6 +85,8 @@ Mockito `verify(times/never)`를 사용한다.
 | `현재 작업` | Member 포인트 규칙과 관리자 포인트 충전 흐름이 컨트롤러/repository 직접 호출에 기대고 있었다. | `MemberContractTest`로 포인트 충전/차감 규칙을 고정하고 `ChargeMemberPointUseCase` 구현체를 추가했다. 관리자 포인트 충전 endpoint는 해당 UseCase를 호출한다. |
 | `현재 작업` | 관리자 회원 생성/목록/수정/삭제가 `AdminMemberController`에서 repository를 직접 호출했다. | 관리자 회원 생성/목록/단건 조회/수정/삭제 UseCase 구현체를 추가하고 `AdminMemberApiTest`와 `MemberServiceTest`로 고정했다. |
 | `현재 작업` | Member 오류 메시지가 `Member not found. id=...`처럼 DB 식별자를 노출할 수 있었다. | Member 사용자 노출 오류 메시지는 `회원이 존재하지 않습니다.`로 고정했다. 다른 도메인의 `id=` 노출 메시지는 공통 오류 메시지 정책 정리 작업에서 추가 검토한다. |
+| `현재 작업` | 일반 회원가입/로그인과 Kakao 로그인/자동 회원가입 흐름의 입력 경계가 달랐고, `KakaoAuthController`가 외부 client와 repository를 직접 호출했다. | 일반 인증 UseCase는 `MemberCredentialsCommand`, Kakao callback UseCase는 `KakaoAuthorizationCodeCommand`를 받게 했다. `KakaoLoginClient`를 외부 API 포트로 분리하고 실제 REST 구현체와 fake 테스트 구현을 나눴다. |
+| `현재 작업` | `auth`, `member`, `admin`이 최상위/동일 패키지에 섞여 있어 Member 관련 인증과 관리자 흐름의 소유 도메인이 불분명했고, `service`/`usecase`도 클래스가 너무 많아 한 패키지에서 목적을 읽기 어려웠다. | `gift.member` 아래 `auth`, `admin`, `controller`, `domain`을 분리하고, `service`/`usecase`는 `auth`와 `management` workflow 하위 패키지로 정리했다. 테스트 패키지도 같은 구조로 맞췄다. |
 
 ## 식별된 정책 변경
 
@@ -106,7 +108,7 @@ Mockito `verify(times/never)`를 사용한다.
 
 | 분류 | 작업 | 현재 상태 |
 | --- | --- | --- |
-| 구조 해결 | 컨트롤러 로직을 하나의 API 동작당 하나의 UseCase 서비스로 계속 추출한다. | 로그인, 관리자 회원 기능, 남은 API/admin 흐름을 검토해야 한다. |
+| 구조 해결 | 컨트롤러 로직을 하나의 API 동작당 하나의 UseCase 서비스로 계속 추출한다. | 관리자 Product 기능과 남은 API/admin 흐름을 검토해야 한다. |
 | 구조 해결 | 서비스/UseCase 메서드에 트랜잭션 경계를 추가한다. | 클래스 단위 `@Transactional`은 사용하지 않고 메서드 단위로만 선언한다. |
 | 구조 해결 | 서비스 입력 경계를 HTTP request DTO가 아니라 command/VO로 통일한다. | 단순 값 검증은 컨트롤러에서 트랜잭션 시작 전에 끝내고, 서비스는 검증 완료 입력과 상태 의존 규칙만 처리한다. |
 | 문제 해결 | FK 삭제 오류, 런타임 오류, 정책 공백을 계속 수집한다. | 새로 발견한 동작 문제는 구조 변경보다 먼저 문제 해결 항목에 기록한다. |
@@ -118,7 +120,7 @@ Mockito `verify(times/never)`를 사용한다.
 | `Category` | 완료: `CategoryContractTest` | 완료: `CategoryServiceTest`, `CategoryApiTest` | 완료: controller, domain, query, service, usecase 패키지 분리, 생성/수정 입력은 `CategoryCommand`로 전달 | 삭제 정책 정의 완료: Product와 무관하게 삭제하고 누락된 Category는 `미분류 카테고리`로 표시한다. |
 | `Product` | 완료: `ProductContractTest` | 완료: `ProductUseCaseServiceTest`, 관리자 상품 미분류 API 테스트, 주문 재고 동시성 서비스 테스트 | 진행 중: Product 패키지와 UseCase 서비스가 존재하고 조회 구현은 query 패키지에 있다. 일반 API 입력은 `ProductName` VO와 `ProductCommand`로 전달한다. | Wish 관련 삭제 정책과 주문 재고 동시성은 완료. Order는 Product id 값만 보관하므로 Product 삭제와 주문 이력은 분리됐다. |
 | `Option` | 부분 완료: product/option 서비스 테스트로 일부 커버하지만 독립 계약 테스트는 아직 없다. | 완료: `ProductOptionUseCaseServiceTest`, `OptionApiTest`, `OrderServiceTest`, `OrderConcurrencyServiceTest` | 진행 중: Option 동작은 Product usecase/service 흐름 아래에 있고, 생성/삭제/재고 차감은 Product 루트 메서드로 수행한다. 생성 입력은 `OptionName` VO와 `OptionCommand`로 전달하고 조회 API는 `OptionQueryDao`가 담당한다. | Order는 Option id와 스냅샷만 보관하므로 주문된 Option도 Product Aggregate 규칙상 삭제 가능하면 삭제된다. 상품 생성 시 옵션은 없어도 되지만, 옵션이 등록된 뒤 마지막 옵션 삭제는 금지한다. |
-| `Member` | 완료: `MemberContractTest` | 완료: 회원가입/로그인 API, 관리자 회원 API, 회원가입/로그인/포인트 충전/관리자 회원 서비스 테스트, 주문 포인트 동시성 서비스 테스트 | 부분 완료: 회원가입/로그인/관리자 회원/포인트 충전 UseCase 서비스는 존재한다. Kakao 인증 흐름은 아직 auth controller에 남아 있다. | 중복 회원가입과 주문 포인트 차감 동시성은 해결됐고, Wish/Order가 있을 때의 Member 삭제 정책이 더 필요하다. |
+| `Member` | 완료: `MemberContractTest` | 완료: 회원가입/로그인 API, Kakao 인증 API, 관리자 회원 API, 회원가입/로그인/Kakao callback/포인트 충전/관리자 회원 서비스 테스트, 주문 포인트 동시성 서비스 테스트 | 부분 완료: `auth`, `admin`, `controller`, `domain` 패키지를 분리하고, `service`/`usecase`는 `auth`와 `management`로 분류했다. 회원가입/로그인/Kakao 인증/관리자 회원/포인트 충전 UseCase 서비스는 존재한다. Member 삭제 정책과 동시성 검토가 남아 있다. | 중복 회원가입과 주문 포인트 차감 동시성은 해결됐고, Wish/Order가 있을 때의 Member 삭제 정책이 더 필요하다. |
 | `Wish` | 완료: `WishContractTest` | 완료: `WishServiceTest`, `WishApiTest` | 완료: controller, domain, query, service, usecase 패키지 분리, 추가 입력은 `WishCommand`로 전달, `Member`/`Product` 직접 객체 참조 제거, 목록 응답용 `wish`-`product` 조인 쿼리 분리 | 현재 API 정책은 정의됨: 인증 필요, 중복 추가는 기존 Wish 반환, 삭제는 소유자만 가능. Product가 없는 Wish는 목록에서 미노출한다. 동시 중복 추가와 Product/Member 삭제 정책은 남아 있다. |
 | `Order` | 부분 완료: `OrderContractTest`, `CreateOrderServiceTest`, `KakaoOrderMessageListenerTest` | 완료: `OrderServiceTest`, `OrderConcurrencyServiceTest`, `OrderApiTest` | 완료: controller, domain, query, service, usecase 패키지 분리. 생성 입력은 `OrderCommand`로 전달하고, 목록 조회는 `JdbcTemplate` query DAO로 `orders` 스냅샷을 읽는다. Order는 `productId`, `optionId`, `memberId` 값과 주문 당시 스냅샷을 보관한다. | 재고/포인트 동시성, 주문 목록 스냅샷, Kakao afterCommit async, 주문 후 Wish 유지 정책, 미인증 API 응답 정책은 해결됐다. |
 
@@ -129,7 +131,7 @@ Mockito `verify(times/never)`를 사용한다.
 | `Category` | 완료: 생성, 목록, 수정, 삭제 UseCase 존재 | 완료: Category 서비스는 메서드 단위 `@Transactional` 사용 | 완료: `Category`는 Product 없이 존재할 수 있는 Aggregate root | TODO: 중복 Category 이름, 동시 수정/삭제 확인 |
 | `Product` | 현재 Product/Option 흐름은 완료, 관리자 Product UseCase 구현 검토 필요 | 부분 완료: Product 서비스는 메서드 단위 `@Transactional` 사용, 관리자 흐름 검토 필요 | 완료: `Product`는 Aggregate root이고 `categoryId`만 저장하며 `Option` 재고 변경을 루트 메서드로 수행한다 | 주문 재고 차감과 주문 중 옵션 삭제 동시성은 Product version으로 확인했다. TODO: Wish, Order, 누락 Category와 동시 삭제/수정 경쟁 확인 |
 | `Option` | 부분 완료: Product 패키지 아래에서 목록/생성/삭제 UseCase 존재 | 현재 Option 서비스는 완료, 이후 수정 흐름 추가 시 경계 필요 | 완료: `Option`은 별도 root가 아니라 `Product`에 소유된다 | 주문 재고 차감, 동시 옵션 삭제, 주문 중 옵션 삭제 충돌, 동시 중복 이름 생성은 Product 루트 version으로 해결했다. |
-| `Member` | 완료: 회원가입/로그인/관리자 생성/목록/단건 조회/수정/삭제/포인트 충전 UseCase 존재 | 부분 완료: 회원가입, 로그인, 관리자 회원, 포인트 충전, 주문 포인트 차감 서비스 경계 존재. Kakao 인증의 Member 변경 경계 검토 필요 | TODO: Wish, Order, Point, Kakao access token을 기준으로 `Member` root 경계 확인 | 중복 회원가입과 주문 포인트 차감은 완료, TODO: 동시 포인트 충전과 Member 삭제 확인 |
+| `Member` | 완료: 회원가입/로그인/Kakao 로그인 URI/Kakao callback/관리자 생성/목록/단건 조회/수정/삭제/포인트 충전 UseCase 존재 | 완료: 회원가입, 로그인, Kakao callback, 관리자 회원, 포인트 충전, 주문 포인트 차감 서비스 경계 존재 | TODO: Wish, Order, Point, Kakao access token을 기준으로 `Member` root 경계 확인 | 중복 회원가입과 주문 포인트 차감은 완료, TODO: 동시 포인트 충전과 Member 삭제 확인 |
 | `Wish` | 완료: 추가, 목록, 삭제 UseCase 식별 및 서비스 구현 | 완료: Wish 서비스는 메서드 단위 `@Transactional` 사용 | 완료: `Wish`는 별도 루트이며 `memberId`, `productId` 값만 보관한다. 삭제 소유권은 `memberId`로 검증한다. | TODO: 동시 중복 Wish 추가와 소유권 기반 삭제 경쟁 확인 |
 | `Order` | 완료: 생성 UseCase 서비스와 목록 UseCase 서비스 존재 | 완료: 생성/목록 서비스는 메서드 단위 `@Transactional` 사용 | 완료: `Order`는 불변 이력 Aggregate root로 보고 Product/Option/Member를 id 값과 주문 당시 스냅샷으로 보관한다 | 재고/포인트 차감 동시성, 목록 스냅샷, Kakao afterCommit async, 주문 후 Wish 유지는 완료 |
 
@@ -205,8 +207,10 @@ Mockito `verify(times/never)`를 사용한다.
 - [x] 동시 중복 회원가입이 `400 Bad Request`를 반환하도록 수정한다.
 - [x] Member 포인트 충전/차감과 식별성 규칙 계약 테스트를 추가한다.
 - [x] 로그인 로직을 하나의 API 동작에 대응하는 UseCase 서비스로 추출한다.
+- [x] Kakao 로그인 URI 생성과 Kakao callback 자동 회원가입/로그인을 하나의 API 동작당 하나의 UseCase 서비스로 추출한다.
 - [x] 관리자 포인트 충전 동작을 하나의 UseCase 서비스로 추출한다.
 - [x] 관리자 회원 생성/목록/단건 조회/수정/삭제 동작을 각각 하나의 UseCase 서비스로 추출한다.
+- [x] Member 관련 일반 API, 인증, 관리자, 도메인 패키지를 `gift.member` 하위로 정리하고, service/usecase는 `auth`와 `management`로 분류한다.
 - [ ] Wish, Order, Point, Kakao access token 기준으로 `Member` Aggregate root 경계를 확인한다.
 - [ ] Wish 또는 주문 이력이 있는 Member 삭제 정책을 정의한다.
 - [ ] 동시 포인트 충전/차감과 Member 삭제 동작을 검토한다.

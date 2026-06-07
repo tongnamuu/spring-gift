@@ -2,8 +2,8 @@ package gift.order.service;
 
 import gift.category.domain.Category;
 import gift.category.domain.CategoryRepository;
-import gift.member.Member;
-import gift.member.MemberRepository;
+import gift.member.domain.Member;
+import gift.member.domain.MemberRepository;
 import gift.order.controller.OrderResponse;
 import gift.order.domain.Order;
 import gift.order.domain.OrderRepository;

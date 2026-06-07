@@ -12,6 +12,7 @@ Spring Boot gift service for practicing production-like execution, automated ver
 - Baseline `./gradlew test`, `./gradlew serviceTest`, and `./gradlew apiTest` currently succeed.
 - API tests now cover category deletion policy, admin product missing-category display, member registration/login behavior, and wish workflows.
 - Category, Product, Wish, member registration, and order creation/listing now have UseCase/service extraction in progress; remaining controller logic still needs the same treatment.
+- Member code is grouped under `gift.member`; auth/admin/controller/domain are separated, and service/usecase classes are further grouped into `auth` and `management` workflows.
 - Wish is treated as a separate aggregate root and stores `memberId`/`productId` without direct `Member` or `Product` object references.
 - Product is the aggregate root for option stock changes. Order creation updates option quantity through `Product.subtractOptionQuantity(...)`, and Product/Member optimistic versions guard stock and point concurrency.
 - Option is not a separate aggregate root. Option creation/deletion goes through Product, only root repositories are used for writes, and read APIs use dedicated `JdbcTemplate` query objects.
@@ -83,7 +84,7 @@ Current policy:
 
 ## Member Registration And Login
 
-Member registration and login have been extracted to one-action UseCase services. Current API tests verify the observable behavior against the real MySQL test database.
+Member registration, member login, Kakao login URI creation, and Kakao callback login have been extracted to one-action UseCase services. Current API tests verify the observable behavior against the real MySQL test database.
 
 Current behavior:
 
@@ -164,6 +165,8 @@ Required Kakao consent items:
 | --- | --- |
 | `account_email` | Kakao login uses the Kakao account email to find or create a `Member`. |
 | `talk_message` | Order creation can send a KakaoTalk message to the logged-in user. |
+
+Kakao login uses `KakaoLoginClient` as an outer-service port. Tests replace it with a fake client so Kakao signup/login behavior is verified without real network calls.
 
 ## Implementation Checklist
 

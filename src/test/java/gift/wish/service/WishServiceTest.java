@@ -2,8 +2,8 @@ package gift.wish.service;
 
 import gift.category.domain.Category;
 import gift.category.domain.CategoryRepository;
-import gift.member.Member;
-import gift.member.MemberRepository;
+import gift.member.domain.Member;
+import gift.member.domain.MemberRepository;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
 import gift.support.AbstractMysqlServiceTest;
