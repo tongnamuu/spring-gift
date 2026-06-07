@@ -1,9 +1,8 @@
 package gift.category.service;
 
-import gift.category.controller.CategoryRequest;
 import gift.category.controller.CategoryResponse;
-import gift.category.domain.Category;
 import gift.category.domain.CategoryRepository;
+import gift.category.usecase.CategoryCommand;
 import gift.category.usecase.CreateCategoryUseCase;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,8 +17,8 @@ public class CreateCategoryService implements CreateCategoryUseCase {
 
     @Override
     @Transactional
-    public CategoryResponse execute(CategoryRequest request) {
-        Category saved = categoryRepository.save(request.toEntity());
+    public CategoryResponse execute(CategoryCommand command) {
+        var saved = categoryRepository.save(command.toEntity());
         return CategoryResponse.from(saved);
     }
 }

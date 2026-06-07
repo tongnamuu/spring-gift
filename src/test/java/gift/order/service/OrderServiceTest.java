@@ -4,17 +4,17 @@ import gift.category.domain.Category;
 import gift.category.domain.CategoryRepository;
 import gift.member.Member;
 import gift.member.MemberRepository;
-import gift.order.controller.OrderRequest;
 import gift.order.controller.OrderResponse;
 import gift.order.usecase.CreateOrderUseCase;
 import gift.order.usecase.GetOrdersUseCase;
+import gift.order.usecase.OrderCommand;
 import gift.product.dto.OptionResponse;
-import gift.product.entity.OptionName;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
 import gift.product.usecase.OptionCommand;
 import gift.product.usecase.CreateOptionUseCase;
 import gift.product.usecase.DeleteOptionUseCase;
+import gift.product.vo.OptionName;
 import gift.support.AbstractMysqlServiceTest;
 import gift.wish.domain.Wish;
 import gift.wish.domain.WishRepository;
@@ -102,7 +102,7 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
 
         OrderResponse created = createOrderUseCase.execute(
             member.getId(),
-            new OrderRequest(option.id(), 2, "2025년 햅쌀 주문")
+            orderCommand(option.id(), 2, "2025년 햅쌀 주문")
         );
         updateProductAfterOrder(product.getId(), category.getId());
 
@@ -124,7 +124,7 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
 
         OrderResponse response = createOrderUseCase.execute(
             member.getId(),
-            new OrderRequest(secondOption.id(), 3, "두 번째 옵션 주문")
+            orderCommand(secondOption.id(), 3, "두 번째 옵션 주문")
         );
 
         assertThat(response.productId()).isEqualTo(product.getId());
@@ -143,7 +143,7 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
 
         createOrderUseCase.execute(
             member.getId(),
-            new OrderRequest(option.id(), 2, "성공 메시지")
+            orderCommand(option.id(), 2, "성공 메시지")
         );
 
         assertThat(kakaoMessageClient.awaitMessage(2000)).isTrue();
@@ -164,7 +164,7 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
 
         assertThatThrownBy(() -> createOrderUseCase.execute(
             member.getId(),
-            new OrderRequest(option.id(), 1, "실패 메시지")
+            orderCommand(option.id(), 1, "실패 메시지")
         )).isInstanceOf(IllegalArgumentException.class);
 
         assertThat(kakaoMessageClient.awaitMessage(300)).isFalse();
@@ -184,7 +184,7 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
 
         OrderResponse created = createOrderUseCase.execute(
             member.getId(),
-            new OrderRequest(orderedOption.id(), 2, "주문된 옵션 삭제 정책")
+            orderCommand(orderedOption.id(), 2, "주문된 옵션 삭제 정책")
         );
 
         deleteOptionUseCase.execute(product.getId(), orderedOption.id());
@@ -212,7 +212,7 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
 
         createOrderUseCase.execute(
             member.getId(),
-            new OrderRequest(option.id(), 1, "반복 구매 상품 주문")
+            orderCommand(option.id(), 1, "반복 구매 상품 주문")
         );
 
         assertThat(wishRepository.existsById(wish.getId())).isTrue();
@@ -261,6 +261,10 @@ class OrderServiceTest extends AbstractMysqlServiceTest {
 
     private OptionResponse saveOption(Product product, String name, int quantity) {
         return createOptionUseCase.execute(product.getId(), new OptionCommand(new OptionName(name), quantity));
+    }
+
+    private OrderCommand orderCommand(Long optionId, int quantity, String message) {
+        return new OrderCommand(optionId, quantity, message);
     }
 
     private void updateProductAfterOrder(Long productId, Long categoryId) {

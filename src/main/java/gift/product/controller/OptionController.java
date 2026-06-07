@@ -2,11 +2,11 @@ package gift.product.controller;
 
 import gift.product.dto.OptionRequest;
 import gift.product.dto.OptionResponse;
-import gift.product.entity.OptionName;
 import gift.product.usecase.OptionCommand;
 import gift.product.usecase.CreateOptionUseCase;
 import gift.product.usecase.DeleteOptionUseCase;
 import gift.product.usecase.GetOptionsUseCase;
+import gift.product.vo.OptionName;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;

@@ -9,6 +9,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Version;
+import gift.product.vo.OptionName;
+import gift.product.vo.ProductName;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;

@@ -2,13 +2,13 @@ package gift.product.controller;
 
 import gift.product.dto.ProductRequest;
 import gift.product.dto.ProductResponse;
-import gift.product.entity.ProductName;
 import gift.product.usecase.CreateProductUseCase;
 import gift.product.usecase.DeleteProductUseCase;
 import gift.product.usecase.GetProductUseCase;
 import gift.product.usecase.GetProductsUseCase;
 import gift.product.usecase.ProductCommand;
 import gift.product.usecase.UpdateProductUseCase;
+import gift.product.vo.ProductName;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

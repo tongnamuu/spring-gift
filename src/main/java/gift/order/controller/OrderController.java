@@ -3,6 +3,7 @@ package gift.order.controller;
 import gift.auth.AuthenticationResolver;
 import gift.order.usecase.CreateOrderUseCase;
 import gift.order.usecase.GetOrdersUseCase;
+import gift.order.usecase.OrderCommand;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -59,7 +60,7 @@ public class OrderController {
             return ResponseEntity.status(401).build();
         }
 
-        OrderResponse response = createOrderUseCase.execute(member.getId(), request);
+        OrderResponse response = createOrderUseCase.execute(member.getId(), toCommand(request));
 
         return ResponseEntity.created(URI.create("/api/orders/" + response.id()))
             .body(response);
@@ -73,5 +74,9 @@ public class OrderController {
     @ExceptionHandler(NoSuchElementException.class)
     public ResponseEntity<Void> handleNoSuchElement() {
         return ResponseEntity.notFound().build();
+    }
+
+    private OrderCommand toCommand(OrderRequest request) {
+        return new OrderCommand(request.optionId(), request.quantity(), request.message());
     }
 }

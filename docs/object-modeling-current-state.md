@@ -154,8 +154,8 @@ DB에서는 `member_id` FK만 갖고 `product_id`는 FK가 아니며, JPA 모델
 | Object | External identifier | Contains or references | Current invariant/rule location | Observed fact |
 | --- | --- | --- | --- | --- |
 | `Category` | `category.id` | none | `Category.update` | 독립 테이블이고 상품 없이 생성 가능하다. |
-| `Product` | `product.id` | `categoryId`, `List<Option>` | `Product.update`, `Product.addOption`, `Product.removeOption`, `Product.subtractOptionQuantity`, `ProductNameValidator` | 상품은 `category_id not null`이고, Category 객체 대신 id 값을 보관한다. 옵션 컬렉션은 JPA 필드로 가진다. |
-| `Option` | `options.id` | `Product` | `Product.addOption`, `Product.removeOption`, `Option.subtractQuantity`, `OptionNameValidator` | 옵션은 `product_id not null`이고 상품 하위 API에서 생성/조회/삭제된다. 쓰기 흐름은 Product 루트를 통해 실행하고, 조회 API는 JDBC query 객체를 사용한다. |
+| `Product` | `product.id` | `categoryId`, `List<Option>` | `Product.update`, `Product.addOption`, `Product.removeOption`, `Product.subtractOptionQuantity`, `ProductName` VO | 상품은 `category_id not null`이고, Category 객체 대신 id 값을 보관한다. 옵션 컬렉션은 JPA 필드로 가진다. |
+| `Option` | `options.id` | `Product` | `Product.addOption`, `Product.removeOption`, `Option.subtractQuantity`, `OptionName` VO | 옵션은 `product_id not null`이고 상품 하위 API에서 생성/조회/삭제된다. 쓰기 흐름은 Product 루트를 통해 실행하고, 조회 API는 JDBC query 객체를 사용한다. |
 | `Member` | `member.id` | none directly | `Member.chargePoint`, `Member.deductPoint`, `Member.updateKakaoAccessToken` | 회원은 독립 테이블이고 위시/주문은 `member_id` 원시 FK로 연결된다. |
 | `Wish` | `wish.id` | `memberId`, `productId` | `Wish.isOwnedBy`, `AddWishService`, `RemoveWishService` | 위시는 별도 테이블/루트이며 회원과 상품을 객체 참조가 아니라 id 값으로 보관한다. |
 | `Order` | `orders.id` | `productId`, `optionId`, `memberId`, 주문 스냅샷 | `CreateOrderService`, `Product.subtractOptionQuantity`, `Member.deductPoint` | 주문 생성 흐름은 옵션 재고, 회원 포인트, 주문 저장을 처리한다. 목록과 Kakao 메시지는 저장된 스냅샷을 사용한다. |
@@ -174,7 +174,7 @@ DB에서는 `member_id` FK만 갖고 `product_id`는 FK가 아니며, JPA 모델
 | Object | Java field relations | Domain/DB relations | External API integration | Current coupling facts |
 | --- | ---: | ---: | --- | --- |
 | `Category` | 0 | 1 | none | `Product.categoryId` 값에서 참조된다. |
-| `Option` | 1 | 2 | none | `Product`에 속하고 `Order`에서 id 값으로 참조된다. 옵션명 검증은 서비스에서, 중복 방지와 최소 옵션 수 규칙은 Product 루트에서 수행한다. |
+| `Option` | 1 | 2 | none | `Product`에 속하고 `Order`에서 id 값으로 참조된다. 옵션명 검증은 컨트롤러가 `OptionName` VO를 만들 때 수행하고, 중복 방지와 최소 옵션 수 규칙은 Product 루트에서 수행한다. |
 | `Member` | 0 | 2 | Kakao OAuth 결과 저장, JWT 발급/해석과 연결 | `Wish`와 `Order`는 `memberId`로 회원을 참조한다. 인증 흐름에서 이메일과 Kakao token이 사용된다. |
 | `Wish` | 0 | 2 | none | `Member`와 `Product` 모두 객체 참조 없이 `memberId`, `productId` 값으로 참조한다. |
 | `Product` | 1 | 3 | none | `Option`을 객체 필드로 참조하고, `Category`와 `Wish`는 id 값 또는 DB 관계로 연결된다. |
@@ -264,19 +264,21 @@ erDiagram
 
 ## DTO Boundary
 
-| Domain | Request DTO | Response DTO |
-| --- | --- | --- |
-| Category | `CategoryRequest` | `CategoryResponse` |
-| Product | `ProductRequest` | `ProductResponse` |
-| Option | `OptionRequest` | `OptionResponse` |
-| Member | `MemberRequest` | `TokenResponse` |
-| Wish | `WishRequest` | `WishResponse` |
-| Order | `OrderRequest` | `OrderResponse` |
+| Domain | Request DTO | UseCase input | Response DTO |
+| --- | --- | --- | --- |
+| Category | `CategoryRequest` | `CategoryCommand` | `CategoryResponse` |
+| Product | `ProductRequest` | `ProductCommand`, `ProductName` | `ProductResponse` |
+| Option | `OptionRequest` | `OptionCommand`, `OptionName` | `OptionResponse` |
+| Member | `MemberRequest` | `MemberRequest` or primitives | `TokenResponse` |
+| Wish | `WishRequest` | `WishCommand` | `WishResponse` |
+| Order | `OrderRequest` | `OrderCommand` | `OrderResponse` |
 
-Request DTO는 Bean Validation을 사용하고, Response DTO는 정적 팩터리로 외부 응답
-형태를 만든다. `WishResponse`처럼 다른 Aggregate 정보가 필요한 응답은 UseCase
-서비스에서 대상 Aggregate를 조회한 뒤 응답으로 조립한다. 관리자 Thymeleaf 컨트롤러는
-DTO보다 엔티티와 폼 파라미터를 직접 사용한다.
+Request DTO는 Bean Validation을 사용한다. Controller는 단순 값 검증이 끝난 뒤
+UseCase command 또는 VO를 생성하고, 트랜잭션 서비스는 HTTP request DTO가 아니라
+검증 완료 입력을 받는다. Response DTO는 정적 팩터리로 외부 응답 형태를 만든다.
+`WishResponse`처럼 다른 Aggregate 정보가 필요한 응답은 UseCase 서비스에서 대상
+Aggregate를 조회한 뒤 응답으로 조립한다. 관리자 Thymeleaf 컨트롤러는 DTO보다 엔티티와
+폼 파라미터를 직접 사용한다.
 
 ## Current UseCase Interfaces
 
@@ -299,12 +301,13 @@ UseCase 연결은 객체별로 진행 중이다. 현재 Category, Product 일부
 
 ### Product
 
-1. `ProductController`는 `ProductRequest`를 검증한다.
-2. 상품명 규칙은 `ProductNameValidator`에서 확인한다.
-3. `CategoryRepository`로 카테고리를 조회한다.
-4. `Product`를 생성하거나 `update`로 변경한다.
-5. `ProductRepository`에 저장한다.
-6. 상품 단건/목록 조회 응답은 `product.query.ProductQueryDao`가 `product`와 `options`를 명시적 SQL로 조회해 옵션 목록을 포함한 `ProductResponse`로 만든다.
+1. `ProductController`는 `ProductRequest`를 Bean Validation으로 검증한다.
+2. 상품명 규칙은 컨트롤러가 `ProductName` VO를 만들 때 확인한다.
+3. 컨트롤러는 `ProductCommand`를 만들어 `CreateProductUseCase` 또는 `UpdateProductUseCase`에 전달한다.
+4. 서비스는 `CategoryRepository`로 카테고리를 조회한다.
+5. `Product`를 생성하거나 `update`로 변경한다.
+6. `ProductRepository`에 저장한다.
+7. 상품 단건/목록 조회 응답은 `product.query.ProductQueryDao`가 `product`와 `options`를 명시적 SQL로 조회해 옵션 목록을 포함한 `ProductResponse`로 만든다.
 
 관리자 상품 화면도 같은 엔티티와 리포지토리를 사용하지만, API DTO 대신 폼 파라미터와
 Thymeleaf 모델을 직접 다룬다.
@@ -312,7 +315,7 @@ Thymeleaf 모델을 직접 다룬다.
 ### Option
 
 1. `OptionController`는 각 동작을 `GetOptionsUseCase`, `CreateOptionUseCase`, `DeleteOptionUseCase`에 위임한다.
-2. 옵션명 규칙은 `OptionNameValidator`에서 확인한다.
+2. 옵션명 규칙은 컨트롤러가 `OptionName` VO를 만들 때 확인하고 `OptionCommand`로 서비스에 전달한다.
 3. `CreateOptionService`는 Product 루트를 조회하고 `Product.addOption`으로 옵션을 추가한 뒤 `ProductRepository.save(product)`로 저장한다.
 4. `DeleteOptionService`는 Product 루트를 조회하고 `Product.removeOption(optionId)`로 삭제 규칙을 적용한 뒤 `ProductRepository.save(product)`로 저장한다.
 5. 상품 생성 시점에는 옵션 없이 존재할 수 있다. 다만 옵션이 등록된 뒤에는 마지막 옵션 삭제를 `옵션이 1개인 상품은 옵션을 삭제할 수 없습니다.` 메시지로 거절한다.
@@ -330,27 +333,29 @@ Thymeleaf 모델을 직접 다룬다.
 ### Wish
 
 1. `WishController`는 `AuthenticationResolver`로 현재 회원을 찾는다.
-2. `AddWishService`는 `ProductRepository`로 상품을 조회한다.
-3. 이미 같은 회원과 상품의 위시가 있으면 기존 위시를 반환한다.
-4. 새 위시는 `memberId`와 `productId`로 생성한다.
-5. `wish.query.GetWishesService`는 `JdbcTemplate` 기반 `wish.query.WishQueryDao`로 `wish`와 `product`를 inner join해서 응답을 조립한다.
-6. Product row가 없는 Wish row는 목록 응답에 노출하지 않는다.
-7. Product 삭제는 Wish row를 수정하거나 삭제하지 않는다.
-8. `RemoveWishService`는 `Wish.isOwnedBy(memberId)`로 소유권을 확인하고, 다른 회원의 위시면 403 응답으로 변환될 예외를 발생시킨다.
+2. 컨트롤러는 `WishRequest`를 Bean Validation으로 검증한 뒤 `WishCommand`로 서비스에 전달한다.
+3. `AddWishService`는 `ProductRepository`로 상품을 조회한다.
+4. 이미 같은 회원과 상품의 위시가 있으면 기존 위시를 반환한다.
+5. 새 위시는 `memberId`와 `productId`로 생성한다.
+6. `wish.query.GetWishesService`는 `JdbcTemplate` 기반 `wish.query.WishQueryDao`로 `wish`와 `product`를 inner join해서 응답을 조립한다.
+7. Product row가 없는 Wish row는 목록 응답에 노출하지 않는다.
+8. Product 삭제는 Wish row를 수정하거나 삭제하지 않는다.
+9. `RemoveWishService`는 `Wish.isOwnedBy(memberId)`로 소유권을 확인하고, 다른 회원의 위시면 403 응답으로 변환될 예외를 발생시킨다.
 
 ### Order
 
 1. `OrderController`는 `AuthenticationResolver`로 현재 회원을 찾고 주문 생성은 `CreateOrderUseCase`, 주문 목록은 `GetOrdersUseCase`에 위임한다.
-2. `CreateOrderService`는 `ProductRepository.findByOptionId`로 Product 루트를 조회한다.
-3. `Product.subtractOptionQuantity(optionId, quantity)`로 Product 루트를 통해 옵션 재고를 차감한다.
-4. `Member.deductPoint(product.price * quantity)`로 포인트를 차감한다.
-5. `Order`는 `productId`, `optionId`, `memberId` 값과 상품명, 옵션명, 단가, 이미지 URL 스냅샷으로 저장한다.
-6. `order.query.GetOrdersService`는 `JdbcTemplate` 기반 `order.query.OrderQueryDao`로 `orders` 스냅샷 컬럼을 직접 조회한다.
-7. 조회 API는 객체 관계 변경이 성능, join 형태, N+1 여부에 영향을 주지 않도록 JPA 엔티티 탐색 대신 명시적 SQL을 사용한다.
-8. Kakao access token이 있으면 저장된 Order 스냅샷으로 `OrderCreatedEvent`를 발행한다.
-9. `KakaoOrderMessageListener`는 `@TransactionalEventListener(AFTER_COMMIT)`와 `@Async`로 트랜잭션 성공 이후 비동기 best-effort 메시지를 전송한다.
-10. 실제 Kakao 전송은 외부 연동 포트인 `KakaoMessageSender`를 통해 수행하며, `KakaoMessageClient`가 이를 구현한다.
-11. 트랜잭션 경계에서 발생한 `ConcurrencyFailureException`은 공통 API 예외 처리에서 `409 Conflict`로 변환한다.
+2. 컨트롤러는 `OrderRequest`를 Bean Validation으로 검증한 뒤 `OrderCommand`로 서비스에 전달한다.
+3. `CreateOrderService`는 `ProductRepository.findByOptionId`로 Product 루트를 조회한다.
+4. `Product.subtractOptionQuantity(optionId, quantity)`로 Product 루트를 통해 옵션 재고를 차감한다.
+5. `Member.deductPoint(product.price * quantity)`로 포인트를 차감한다.
+6. `Order`는 `productId`, `optionId`, `memberId` 값과 상품명, 옵션명, 단가, 이미지 URL 스냅샷으로 저장한다.
+7. `order.query.GetOrdersService`는 `JdbcTemplate` 기반 `order.query.OrderQueryDao`로 `orders` 스냅샷 컬럼을 직접 조회한다.
+8. 조회 API는 객체 관계 변경이 성능, join 형태, N+1 여부에 영향을 주지 않도록 JPA 엔티티 탐색 대신 명시적 SQL을 사용한다.
+9. Kakao access token이 있으면 저장된 Order 스냅샷으로 `OrderCreatedEvent`를 발행한다.
+10. `KakaoOrderMessageListener`는 `@TransactionalEventListener(AFTER_COMMIT)`와 `@Async`로 트랜잭션 성공 이후 비동기 best-effort 메시지를 전송한다.
+11. 실제 Kakao 전송은 외부 연동 포트인 `KakaoMessageSender`를 통해 수행하며, `KakaoMessageClient`가 이를 구현한다.
+12. 트랜잭션 경계에서 발생한 `ConcurrencyFailureException`은 공통 API 예외 처리에서 `409 Conflict`로 변환한다.
 
 주문 생성 후에도 Wish는 삭제하지 않는다. Wish는 반복 구매 후보를 보관하는 별도 루트이며,
 주문은 일회성 구매 이력으로 다룬다.
@@ -359,8 +364,8 @@ Thymeleaf 모델을 직접 다룬다.
 
 | Rule | Current location |
 | --- | --- |
-| 상품명 길이, 허용 문자, 일반 API의 `카카오` 포함 제한 | `ProductNameValidator`, 컨트롤러 호출 |
-| 옵션명 길이와 허용 문자 | `OptionNameValidator`, `CreateOptionService` |
+| 상품명 길이, 허용 문자, 일반 API의 `카카오` 포함 제한 | `ProductName` VO, 컨트롤러 호출 |
+| 옵션명 길이와 허용 문자 | `OptionName` VO, 컨트롤러 호출 |
 | 상품별 옵션명 중복 금지, 다른 상품 간 같은 옵션명 허용 | `Product.addOption` |
 | 옵션 등록 후 마지막 옵션 삭제 금지, 상품 생성 시 옵션 없음 허용 | `Product.removeOption`, `ProductContractTest` |
 | 재고 초과 차감 금지 | `Option.subtractQuantity` |

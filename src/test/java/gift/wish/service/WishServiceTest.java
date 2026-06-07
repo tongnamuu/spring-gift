@@ -7,12 +7,12 @@ import gift.member.MemberRepository;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
 import gift.support.AbstractMysqlServiceTest;
-import gift.wish.controller.WishRequest;
 import gift.wish.controller.WishResponse;
 import gift.wish.domain.Wish;
 import gift.wish.domain.WishRepository;
 import gift.wish.query.GetWishesService;
 import gift.wish.usecase.AddWishResult;
+import gift.wish.usecase.WishCommand;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -74,7 +74,7 @@ class WishServiceTest extends AbstractMysqlServiceTest {
         Member member = saveMember("add");
         Product product = saveProduct("add");
 
-        AddWishResult result = addWishService.execute(member.getId(), new WishRequest(product.getId()));
+        AddWishResult result = addWishService.execute(member.getId(), new WishCommand(product.getId()));
 
         assertThat(result.created()).isTrue();
         assertThat(result.response().id()).isNotNull();
@@ -98,7 +98,7 @@ class WishServiceTest extends AbstractMysqlServiceTest {
         Product product = saveProduct("duplicate");
         Wish existing = saveWish(member, product);
 
-        AddWishResult result = addWishService.execute(member.getId(), new WishRequest(product.getId()));
+        AddWishResult result = addWishService.execute(member.getId(), new WishCommand(product.getId()));
 
         assertThat(result.created()).isFalse();
         assertThat(result.response().id()).isEqualTo(existing.getId());
@@ -109,7 +109,7 @@ class WishServiceTest extends AbstractMysqlServiceTest {
     void addWishThrowsWhenProductDoesNotExist() {
         Member member = saveMember("missing-product");
 
-        assertThatThrownBy(() -> addWishService.execute(member.getId(), new WishRequest(Long.MAX_VALUE)))
+        assertThatThrownBy(() -> addWishService.execute(member.getId(), new WishCommand(Long.MAX_VALUE)))
             .isInstanceOf(NoSuchElementException.class);
     }
 

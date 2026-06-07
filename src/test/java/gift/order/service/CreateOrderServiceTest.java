@@ -2,9 +2,9 @@ package gift.order.service;
 
 import gift.member.Member;
 import gift.member.MemberRepository;
-import gift.order.controller.OrderRequest;
 import gift.order.domain.Order;
 import gift.order.domain.OrderRepository;
+import gift.order.usecase.OrderCommand;
 import gift.product.entity.Option;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
@@ -47,7 +47,7 @@ class CreateOrderServiceTest {
         when(productRepository.findByOptionId(OPTION_ID)).thenReturn(Optional.of(product));
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        service.execute(MEMBER_ID, new OrderRequest(OPTION_ID, 2, "성공 메시지"));
+        service.execute(MEMBER_ID, new OrderCommand(OPTION_ID, 2, "성공 메시지"));
 
         ArgumentCaptor<OrderCreatedEvent> eventCaptor = ArgumentCaptor.forClass(OrderCreatedEvent.class);
         verify(eventPublisher, times(1)).publishEvent(eventCaptor.capture());
@@ -77,7 +77,7 @@ class CreateOrderServiceTest {
         when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
         when(productRepository.findByOptionId(OPTION_ID)).thenReturn(Optional.of(product));
 
-        assertThatThrownBy(() -> service.execute(MEMBER_ID, new OrderRequest(OPTION_ID, 1, "실패 메시지")))
+        assertThatThrownBy(() -> service.execute(MEMBER_ID, new OrderCommand(OPTION_ID, 1, "실패 메시지")))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("포인트가 부족합니다.");
 

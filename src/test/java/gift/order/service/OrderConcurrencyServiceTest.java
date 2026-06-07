@@ -4,18 +4,18 @@ import gift.category.domain.Category;
 import gift.category.domain.CategoryRepository;
 import gift.member.Member;
 import gift.member.MemberRepository;
-import gift.order.controller.OrderRequest;
 import gift.order.controller.OrderResponse;
 import gift.order.domain.Order;
 import gift.order.domain.OrderRepository;
 import gift.order.usecase.CreateOrderUseCase;
+import gift.order.usecase.OrderCommand;
 import gift.product.dto.OptionResponse;
-import gift.product.entity.OptionName;
 import gift.product.entity.Option;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
 import gift.product.usecase.OptionCommand;
 import gift.product.usecase.CreateOptionUseCase;
+import gift.product.vo.OptionName;
 import gift.support.AbstractMysqlServiceTest;
 import jakarta.persistence.OptimisticLockException;
 import org.junit.jupiter.api.AfterEach;
@@ -198,7 +198,7 @@ class OrderConcurrencyServiceTest extends AbstractMysqlServiceTest {
                     try {
                         Member member = members.get(index);
                         OptionResponse option = options.get(index);
-                        OrderRequest request = new OrderRequest(option.id(), 1, "동시 주문");
+                        OrderCommand request = new OrderCommand(option.id(), 1, "동시 주문");
                         OrderResponse response = createOrderUseCase.execute(member.getId(), request);
                         return CreateOrderResult.ok(response);
                     } catch (RuntimeException e) {

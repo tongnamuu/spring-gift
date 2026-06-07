@@ -1,7 +1,7 @@
 package gift.product.usecase;
 
 import gift.product.entity.Product;
-import gift.product.entity.ProductName;
+import gift.product.vo.ProductName;
 
 public record ProductCommand(
     ProductName name,

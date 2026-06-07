@@ -1,23 +1,15 @@
-package gift.product.entity;
+package gift.product.vo;
 
-import gift.product.validator.ProductNameValidator;
+import gift.product.validator.OptionNameValidator;
 
 import java.util.List;
 import java.util.Objects;
 
-public class ProductName {
+public class OptionName {
     private final String value;
 
-    public ProductName(String value) {
-        this(value, false);
-    }
-
-    public static ProductName allowingKakao(String value) {
-        return new ProductName(value, true);
-    }
-
-    private ProductName(String value, boolean allowKakao) {
-        List<String> errors = ProductNameValidator.validate(value, allowKakao);
+    public OptionName(String value) {
+        List<String> errors = OptionNameValidator.validate(value);
         if (!errors.isEmpty()) {
             throw new IllegalArgumentException(String.join(", ", errors));
         }
@@ -33,7 +25,7 @@ public class ProductName {
         if (this == other) {
             return true;
         }
-        if (!(other instanceof ProductName that)) {
+        if (!(other instanceof OptionName that)) {
             return false;
         }
         return Objects.equals(value, that.value);

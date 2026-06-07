@@ -1,12 +1,12 @@
 package gift.wish.service;
 
 import gift.product.repository.ProductRepository;
-import gift.wish.controller.WishRequest;
 import gift.wish.controller.WishResponse;
 import gift.wish.domain.Wish;
 import gift.wish.domain.WishRepository;
 import gift.wish.usecase.AddWishResult;
 import gift.wish.usecase.AddWishUseCase;
+import gift.wish.usecase.WishCommand;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,9 +24,9 @@ public class AddWishService implements AddWishUseCase {
 
     @Override
     @Transactional
-    public AddWishResult execute(Long memberId, WishRequest request) {
-        var product = productRepository.findById(request.productId())
-            .orElseThrow(() -> new NoSuchElementException("상품이 존재하지 않습니다. id=" + request.productId()));
+    public AddWishResult execute(Long memberId, WishCommand command) {
+        var product = productRepository.findById(command.productId())
+            .orElseThrow(() -> new NoSuchElementException("상품이 존재하지 않습니다. id=" + command.productId()));
 
         return wishRepository.findByMemberIdAndProductId(memberId, product.getId())
             .map(existing -> new AddWishResult(

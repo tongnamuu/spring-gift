@@ -1,5 +1,6 @@
 package gift.category.controller;
 
+import gift.category.usecase.CategoryCommand;
 import gift.category.usecase.CreateCategoryUseCase;
 import gift.category.usecase.DeleteCategoryUseCase;
 import gift.category.usecase.GetCategoriesUseCase;
@@ -46,7 +47,7 @@ public class CategoryController {
 
     @PostMapping
     public ResponseEntity<CategoryResponse> createCategory(@Valid @RequestBody CategoryRequest request) {
-        CategoryResponse response = createCategoryUseCase.execute(request);
+        CategoryResponse response = createCategoryUseCase.execute(toCommand(request));
         return ResponseEntity.created(URI.create("/api/categories/" + response.id()))
             .body(response);
     }
@@ -56,7 +57,7 @@ public class CategoryController {
         @PathVariable Long id,
         @Valid @RequestBody CategoryRequest request
     ) {
-        return updateCategoryUseCase.execute(id, request)
+        return updateCategoryUseCase.execute(id, toCommand(request))
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -70,5 +71,14 @@ public class CategoryController {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<String> handleIllegalArgument(IllegalArgumentException e) {
         return ResponseEntity.badRequest().body(e.getMessage());
+    }
+
+    private CategoryCommand toCommand(CategoryRequest request) {
+        return new CategoryCommand(
+            request.name(),
+            request.color(),
+            request.imageUrl(),
+            request.description()
+        );
     }
 }

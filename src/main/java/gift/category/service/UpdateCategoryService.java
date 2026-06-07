@@ -1,8 +1,8 @@
 package gift.category.service;
 
-import gift.category.controller.CategoryRequest;
 import gift.category.controller.CategoryResponse;
 import gift.category.domain.CategoryRepository;
+import gift.category.usecase.CategoryCommand;
 import gift.category.usecase.UpdateCategoryUseCase;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,10 +19,10 @@ public class UpdateCategoryService implements UpdateCategoryUseCase {
 
     @Override
     @Transactional
-    public Optional<CategoryResponse> execute(Long id, CategoryRequest request) {
+    public Optional<CategoryResponse> execute(Long id, CategoryCommand command) {
         return categoryRepository.findById(id)
             .map(category -> {
-                category.update(request.name(), request.color(), request.imageUrl(), request.description());
+                category.update(command.name(), command.color(), command.imageUrl(), command.description());
                 return CategoryResponse.from(categoryRepository.save(category));
             });
     }

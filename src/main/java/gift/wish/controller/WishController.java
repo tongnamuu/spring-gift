@@ -6,6 +6,7 @@ import gift.wish.usecase.AddWishResult;
 import gift.wish.usecase.AddWishUseCase;
 import gift.wish.usecase.GetWishesUseCase;
 import gift.wish.usecase.RemoveWishUseCase;
+import gift.wish.usecase.WishCommand;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -65,7 +66,7 @@ public class WishController {
             return ResponseEntity.status(401).build();
         }
 
-        AddWishResult result = addWishUseCase.execute(member.getId(), request);
+        AddWishResult result = addWishUseCase.execute(member.getId(), toCommand(request));
         if (!result.created()) {
             return ResponseEntity.ok(result.response());
         }
@@ -95,5 +96,9 @@ public class WishController {
     @ExceptionHandler(WishAccessDeniedException.class)
     public ResponseEntity<Void> handleWishAccessDenied() {
         return ResponseEntity.status(403).build();
+    }
+
+    private WishCommand toCommand(WishRequest request) {
+        return new WishCommand(request.productId());
     }
 }

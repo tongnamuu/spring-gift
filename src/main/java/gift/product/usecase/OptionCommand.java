@@ -1,6 +1,6 @@
 package gift.product.usecase;
 
-import gift.product.entity.OptionName;
+import gift.product.vo.OptionName;
 
 public record OptionCommand(
     OptionName name,

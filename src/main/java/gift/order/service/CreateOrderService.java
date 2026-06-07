@@ -2,11 +2,11 @@ package gift.order.service;
 
 import gift.member.Member;
 import gift.member.MemberRepository;
-import gift.order.controller.OrderRequest;
 import gift.order.controller.OrderResponse;
 import gift.order.domain.Order;
 import gift.order.domain.OrderRepository;
 import gift.order.usecase.CreateOrderUseCase;
+import gift.order.usecase.OrderCommand;
 import gift.product.entity.Option;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
@@ -37,15 +37,15 @@ public class CreateOrderService implements CreateOrderUseCase {
 
     @Override
     @Transactional
-    public OrderResponse execute(Long memberId, OrderRequest request) {
+    public OrderResponse execute(Long memberId, OrderCommand command) {
         Member member = memberRepository.findById(memberId)
             .orElseThrow(() -> new NoSuchElementException("회원이 존재하지 않습니다. id=" + memberId));
-        Product product = productRepository.findByOptionId(request.optionId())
-            .orElseThrow(() -> new NoSuchElementException("옵션이 존재하지 않습니다. id=" + request.optionId()));
+        Product product = productRepository.findByOptionId(command.optionId())
+            .orElseThrow(() -> new NoSuchElementException("옵션이 존재하지 않습니다. id=" + command.optionId()));
 
-        Option option = product.subtractOptionQuantity(request.optionId(), request.quantity());
+        Option option = product.subtractOptionQuantity(command.optionId(), command.quantity());
 
-        int price = product.getPrice() * request.quantity();
+        int price = product.getPrice() * command.quantity();
         member.deductPoint(price);
 
         Order saved = orderRepository.save(new Order(
@@ -56,8 +56,8 @@ public class CreateOrderService implements CreateOrderUseCase {
             option.getName(),
             product.getPrice(),
             product.getImageUrl(),
-            request.quantity(),
-            request.message()
+            command.quantity(),
+            command.message()
         ));
         publishKakaoMessageEvent(member.getKakaoAccessToken(), saved);
         return OrderResponse.from(saved);

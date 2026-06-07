@@ -5,6 +5,7 @@ import gift.category.controller.CategoryResponse;
 import gift.category.domain.Category;
 import gift.category.domain.CategoryRepository;
 import gift.category.query.GetCategoriesService;
+import gift.category.usecase.CategoryCommand;
 import gift.product.entity.Product;
 import gift.product.repository.ProductRepository;
 import gift.support.AbstractMysqlServiceTest;
@@ -64,7 +65,7 @@ class CategoryServiceTest extends AbstractMysqlServiceTest {
             "created by service test"
         );
 
-        CategoryResponse response = createCategoryService.execute(request);
+        CategoryResponse response = createCategoryService.execute(categoryCommand(request));
 
         assertThat(response.id()).isNotNull();
         assertThat(response.name()).isEqualTo(request.name());
@@ -110,7 +111,7 @@ class CategoryServiceTest extends AbstractMysqlServiceTest {
             "updated by service test"
         );
 
-        Optional<CategoryResponse> response = updateCategoryService.execute(category.getId(), request);
+        Optional<CategoryResponse> response = updateCategoryService.execute(category.getId(), categoryCommand(request));
 
         assertThat(response).isPresent();
         assertThat(response.orElseThrow().id()).isEqualTo(category.getId());
@@ -132,7 +133,7 @@ class CategoryServiceTest extends AbstractMysqlServiceTest {
             "missing update"
         );
 
-        Optional<CategoryResponse> response = updateCategoryService.execute(Long.MAX_VALUE, request);
+        Optional<CategoryResponse> response = updateCategoryService.execute(Long.MAX_VALUE, categoryCommand(request));
 
         assertThat(response).isEmpty();
     }
@@ -165,6 +166,15 @@ class CategoryServiceTest extends AbstractMysqlServiceTest {
             "https://example.com/service-test.png",
             "service test category"
         ));
+    }
+
+    private CategoryCommand categoryCommand(CategoryRequest request) {
+        return new CategoryCommand(
+            request.name(),
+            request.color(),
+            request.imageUrl(),
+            request.description()
+        );
     }
 
     private Product saveProduct(String name, Long categoryId) {
