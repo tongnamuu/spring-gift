@@ -27,4 +27,11 @@ class PasswordTest {
 
         assertThat(password.toString()).doesNotContain("password123");
     }
+
+    @Test
+    void passwordMatchesSeedBcryptHash() {
+        Password password = Password.encode("admin1234");
+
+        assertThat(password.matches("$2y$10$MY0SCnICoAGEcs6bJ8iwd.p9IPUzDfjWYcTsybSkd.jPLCXuSW7La")).isTrue();
+    }
 }
