@@ -9,6 +9,7 @@
 <body>
 <div class="container mt-4">
     <h1>회원 수정</h1>
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
     <form th:action="@{/admin/members/{id}/edit(id=${member.id})}" method="post">
         <div class="mb-3">
             <label class="form-label">포인트</label>
@@ -16,12 +17,11 @@
         </div>
         <div class="mb-3">
             <label for="email" class="form-label">이메일</label>
-            <input type="email" class="form-control" id="email" name="email" th:value="${member.email}" required>
+            <input type="email" class="form-control" id="email" name="email" th:value="${email ?: member.email}" required>
         </div>
         <div class="mb-3">
             <label for="password" class="form-label">비밀번호</label>
-            <input type="password" class="form-control" id="password" name="password" th:value="${member.password}"
-                   required>
+            <input type="password" class="form-control" id="password" name="password" required>
         </div>
         <button type="submit" class="btn btn-primary">수정</button>
         <a th:href="@{/admin/members}" class="btn btn-secondary">취소</a>

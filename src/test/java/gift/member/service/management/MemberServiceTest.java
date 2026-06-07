@@ -334,6 +334,30 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
     }
 
     @Test
+    void updateMemberRejectsKakaoAccountPasswordChange() {
+        String email = TEST_EMAIL_PREFIX + "kakao-update@example.com";
+        Member member = new Member(email);
+        member.updateKakaoAccessToken("kakao-access-token");
+        Member saved = memberRepository.save(member);
+
+        assertThatThrownBy(() -> updateMemberUseCase.execute(
+            saved.getId(),
+            TEST_EMAIL_PREFIX + "kakao-update-changed@example.com",
+            password("updated-password")
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("카카오 계정은 비밀번호를 변경할 수 없습니다.");
+
+        Map<String, Object> persisted = jdbcTemplate.queryForMap(
+            "select email, password, kakao_access_token from member where id = ?",
+            saved.getId()
+        );
+        assertThat(persisted.get("email")).isEqualTo(email);
+        assertThat(persisted.get("password")).isNull();
+        assertThat(persisted.get("kakao_access_token")).isEqualTo("kakao-access-token");
+    }
+
+    @Test
     void updateMemberRejectsMissingMember() {
         assertThatThrownBy(() -> updateMemberUseCase.execute(
             Long.MAX_VALUE,

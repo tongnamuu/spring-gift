@@ -16,6 +16,8 @@ import jakarta.persistence.Version;
  */
 @Entity
 public class Member {
+    private static final String KAKAO_PASSWORD_UPDATE_MESSAGE = "카카오 계정은 비밀번호를 변경할 수 없습니다.";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -48,6 +50,9 @@ public class Member {
     }
 
     public void update(String email, Password password) {
+        if (isKakaoAccount()) {
+            throw new IllegalArgumentException(KAKAO_PASSWORD_UPDATE_MESSAGE);
+        }
         this.email = email;
         this.password = password.value();
     }
@@ -104,5 +109,9 @@ public class Member {
 
     public boolean isDeleted() {
         return deleted;
+    }
+
+    public boolean isKakaoAccount() {
+        return kakaoAccessToken != null && !kakaoAccessToken.isBlank();
     }
 }

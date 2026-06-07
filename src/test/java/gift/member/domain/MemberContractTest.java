@@ -76,4 +76,17 @@ class MemberContractTest {
 
         assertThat(member.getKakaoAccessToken()).isEqualTo("kakao-access-token");
     }
+
+    @Test
+    void kakaoMemberRejectsPasswordUpdate() {
+        Member member = new Member("member-contract-kakao@example.com");
+        member.updateKakaoAccessToken("kakao-access-token");
+
+        assertThat(member.isKakaoAccount()).isTrue();
+        assertThatThrownBy(() -> member.update("member-contract-kakao-updated@example.com", Password.encode("password123")))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("카카오 계정은 비밀번호를 변경할 수 없습니다.");
+        assertThat(member.getEmail()).isEqualTo("member-contract-kakao@example.com");
+        assertThat(member.getPassword()).isNull();
+    }
 }

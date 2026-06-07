@@ -127,6 +127,62 @@ class AdminMemberApiTest extends AbstractMysqlApiTest {
     }
 
     @Test
+    void editFormDoesNotExposeEncodedPassword() {
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "edit-form@example.com", Password.encode("password123")));
+
+        ResponseEntity<String> response = restTemplate.getForEntity(
+            "/admin/members/" + member.getId() + "/edit",
+            String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).doesNotContain(member.getPassword());
+    }
+
+    @Test
+    void editMemberShowsBlankPasswordErrorAndKeepsExistingMember() {
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "blank-edit@example.com", Password.encode("password123")));
+        String updatedEmail = TEST_EMAIL_PREFIX + "blank-edit-updated@example.com";
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/admin/members/" + member.getId() + "/edit",
+            formEntity("email", updatedEmail, "password", " "),
+            String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).contains("Password must not be blank.");
+        assertThat(response.getBody()).contains(updatedEmail);
+
+        Member persisted = memberRepository.findById(member.getId()).orElseThrow();
+        assertThat(persisted.getEmail()).isEqualTo(member.getEmail());
+        assertThat(Password.encode("password123").matches(persisted.getPassword())).isTrue();
+    }
+
+    @Test
+    void editKakaoMemberShowsPasswordUpdateErrorAndKeepsExistingMember() {
+        Member member = new Member(TEST_EMAIL_PREFIX + "kakao-edit@example.com");
+        member.updateKakaoAccessToken("kakao-access-token");
+        Member saved = memberRepository.save(member);
+        String updatedEmail = TEST_EMAIL_PREFIX + "kakao-edit-updated@example.com";
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/admin/members/" + saved.getId() + "/edit",
+            formEntity("email", updatedEmail, "password", "updated-password"),
+            String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).contains("카카오 계정은 비밀번호를 변경할 수 없습니다.");
+        assertThat(response.getBody()).contains(updatedEmail);
+
+        Member persisted = memberRepository.findById(saved.getId()).orElseThrow();
+        assertThat(persisted.getEmail()).isEqualTo(member.getEmail());
+        assertThat(persisted.getPassword()).isNull();
+        assertThat(persisted.getKakaoAccessToken()).isEqualTo("kakao-access-token");
+    }
+
+    @Test
     void chargePointPersistsPoint() {
         Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "charge@example.com", Password.encode("password123")));
 

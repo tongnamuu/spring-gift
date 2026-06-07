@@ -89,9 +89,16 @@ public class AdminMemberController {
     public String update(
         @PathVariable Long id,
         @RequestParam String email,
-        @RequestParam String password
+        @RequestParam String password,
+        Model model
     ) {
-        updateMemberUseCase.execute(id, email, Password.encode(password));
+        try {
+            updateMemberUseCase.execute(id, email, Password.encode(password));
+        } catch (IllegalArgumentException e) {
+            populateEditFormError(model, id, email, e.getMessage());
+            return "member/edit";
+        }
+
         return "redirect:/admin/members";
     }
 
@@ -113,5 +120,13 @@ public class AdminMemberController {
     private void populateNewFormError(Model model, String email, String error) {
         model.addAttribute("error", error);
         model.addAttribute("email", email);
+    }
+
+    private void populateEditFormError(Model model, Long id, String email, String error) {
+        final Member member = getMemberUseCase.execute(id)
+            .orElseThrow(() -> new IllegalArgumentException(MEMBER_NOT_FOUND_MESSAGE));
+        model.addAttribute("member", member);
+        model.addAttribute("email", email);
+        model.addAttribute("error", error);
     }
 }
