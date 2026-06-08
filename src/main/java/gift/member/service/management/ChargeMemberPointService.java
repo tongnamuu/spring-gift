@@ -3,6 +3,7 @@ package gift.member.service.management;
 import gift.member.domain.Member;
 import gift.member.domain.MemberRepository;
 import gift.member.usecase.management.ChargeMemberPointUseCase;
+import gift.member.vo.PointAmount;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,10 +19,10 @@ public class ChargeMemberPointService implements ChargeMemberPointUseCase {
 
     @Override
     @Transactional
-    public Member execute(Long id, int amount) {
+    public Member execute(Long id, PointAmount amount) {
         Member member = memberRepository.findByIdAndDeletedFalse(id)
             .orElseThrow(() -> new IllegalArgumentException(MEMBER_NOT_FOUND_MESSAGE));
-        member.chargePoint(amount);
+        member.chargePoint(amount.value());
         return memberRepository.save(member);
     }
 }

@@ -199,6 +199,21 @@ class AdminMemberApiTest extends AbstractMysqlApiTest {
     }
 
     @Test
+    void chargePointReturnsListErrorWhenAmountIsNotPositive() {
+        Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "invalid-charge@example.com", Password.encode("password123")));
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/admin/members/" + member.getId() + "/charge-point",
+            formEntity("amount", "0"),
+            String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).contains("Amount must be greater than zero.");
+        assertThat(findPoint(member.getId())).isZero();
+    }
+
+    @Test
     void deleteMemberMarksMemberDeletedWithoutReferences() {
         Member member = memberRepository.save(new Member(TEST_EMAIL_PREFIX + "delete@example.com", Password.encode("password123")));
 

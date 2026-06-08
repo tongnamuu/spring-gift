@@ -8,6 +8,7 @@ import gift.member.usecase.management.GetMemberUseCase;
 import gift.member.usecase.management.GetMembersUseCase;
 import gift.member.usecase.management.UpdateMemberUseCase;
 import gift.member.vo.Password;
+import gift.member.vo.PointAmount;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -105,9 +106,15 @@ public class AdminMemberController {
     @PostMapping("/{id}/charge-point")
     public String chargePoint(
         @PathVariable Long id,
-        @RequestParam int amount
+        @RequestParam int amount,
+        Model model
     ) {
-        chargeMemberPointUseCase.execute(id, amount);
+        try {
+            chargeMemberPointUseCase.execute(id, new PointAmount(amount));
+        } catch (IllegalArgumentException e) {
+            populateListError(model, e.getMessage());
+            return "member/list";
+        }
         return "redirect:/admin/members";
     }
 
@@ -120,6 +127,11 @@ public class AdminMemberController {
     private void populateNewFormError(Model model, String email, String error) {
         model.addAttribute("error", error);
         model.addAttribute("email", email);
+    }
+
+    private void populateListError(Model model, String error) {
+        model.addAttribute("members", getMembersUseCase.execute());
+        model.addAttribute("error", error);
     }
 
     private void populateEditFormError(Model model, Long id, String email, String error) {

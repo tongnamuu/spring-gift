@@ -98,6 +98,7 @@ Mockito `verify(times/never)`를 사용한다.
 | `이번 변경` | Member 물리 삭제가 `wish.member_id`, `orders.member_id` FK에 막히거나 DB 예외로 노출될 수 있었다. | `member.deleted` 컬럼을 추가하고 삭제 UseCase는 소프트 삭제만 수행한다. Wish/Order row는 유지하며, 삭제된 회원은 관리자 목록/단건 조회/일반 로그인/Kakao 로그인/토큰 인증에서 제외한다. |
 | `이번 변경` | 일반 회원가입, 관리자 회원 생성/수정, 일반 로그인 흐름이 비밀번호를 평문으로 저장하고 평문 문자열 비교로 검증했다. | `Password` VO가 고정 BCrypt encoder로 인코딩한 값을 `value()`로 들고 UseCase에 전달되게 했다. `Member` 생성/수정은 `Password`를 받아 내부에서 인코딩 값을 저장하고, 로그인은 `Password.matches(...)`로 검증한다. |
 | `이번 변경` | 관리자 회원 수정에서 Kakao 로그인으로 생성된 회원도 로컬 비밀번호를 설정할 수 있었다. | Kakao access token이 있는 회원은 Kakao 계정으로 보고, 관리자 수정에서 비밀번호 변경을 시도하면 `카카오 계정은 비밀번호를 변경할 수 없습니다.`로 거부한다. |
+| `이번 변경` | 관리자 포인트 충전 금액 `amount`가 `@Transactional` 서비스 안에서 `Member.chargePoint`를 호출한 뒤에야 0 이하 값으로 검증됐다. | `AdminMemberController`가 `PointAmount` VO를 생성해 단순 값 검증을 트랜잭션 시작 전에 끝낸다. `ChargeMemberPointUseCase`는 검증 완료된 `PointAmount`만 받고, 서비스는 회원 존재 여부와 포인트 상태 변경만 처리한다. |
 
 ## 식별된 정책 변경
 
@@ -134,7 +135,7 @@ Mockito `verify(times/never)`를 사용한다.
 | `Category` | 완료: `CategoryContractTest` | 완료: `CategoryServiceTest`, `CategoryApiTest` | 완료: controller, domain, query, service, usecase 패키지 분리, 생성/수정 입력은 `CategoryCommand`로 전달 | 삭제 정책 정의 완료: Product와 무관하게 삭제하고 누락된 Category는 `미분류 카테고리`로 표시한다. |
 | `Product` | 완료: `ProductContractTest` | 완료: `ProductUseCaseServiceTest`, `AdminProductUseCaseServiceTest`, 관리자 상품 미분류 API 테스트, 주문 재고 동시성 서비스 테스트 | 진행 중: Product 패키지와 UseCase 서비스가 존재하고 조회 구현은 query 패키지에 있다. 일반 API와 관리자 상품 입력은 `ProductName` VO와 `ProductCommand`로 전달한다. 관리자 상품 컨트롤러는 repository를 직접 호출하지 않는다. | Wish 관련 삭제 정책과 주문 재고 동시성은 완료. Order는 Product id 값만 보관하므로 Product 삭제와 주문 이력은 분리됐다. |
 | `Option` | 부분 완료: product/option 서비스 테스트로 일부 커버하지만 독립 계약 테스트는 아직 없다. | 완료: `ProductOptionUseCaseServiceTest`, `OptionApiTest`, `OrderServiceTest`, `OrderConcurrencyServiceTest` | 진행 중: Option 동작은 Product usecase/service 흐름 아래에 있고, 생성/삭제/재고 차감은 Product 루트 메서드로 수행한다. 생성 입력은 `OptionName` VO와 `OptionCommand`로 전달하고 조회 API는 `OptionQueryDao`가 담당한다. | Order는 Option id와 스냅샷만 보관하므로 주문된 Option도 Product Aggregate 규칙상 삭제 가능하면 삭제된다. 상품 생성 시 옵션은 없어도 되지만, 옵션이 등록된 뒤 마지막 옵션 삭제는 금지한다. |
-| `Member` | 완료: `MemberContractTest` | 완료: 회원가입/로그인 API, Kakao 인증 API, 관리자 회원 API, 회원가입/로그인/Kakao callback/포인트 충전/관리자 회원 소프트 삭제/수정/포인트 충전 서비스 테스트, 주문 포인트 동시성 서비스 테스트 | 부분 완료: `auth`, `admin`, `controller`, `domain` 패키지를 분리하고, `service`/`usecase`는 `auth`와 `management`로 분류했다. 회원가입/로그인/Kakao 인증/관리자 회원/포인트 충전/소프트 삭제 UseCase 서비스는 존재한다. | 중복 회원가입, 주문 포인트 차감 동시성, Wish/Order가 있는 회원 삭제 정책, Kakao 계정 비밀번호 변경 금지는 해결됐다. TODO: 동시 포인트 충전/차감과 Member 삭제 경쟁 확인 |
+| `Member` | 완료: `MemberContractTest`, `PointAmountTest` | 완료: 회원가입/로그인 API, Kakao 인증 API, 관리자 회원 API, 회원가입/로그인/Kakao callback/포인트 충전/관리자 회원 소프트 삭제/수정/포인트 충전 서비스 테스트, 주문 포인트 동시성 서비스 테스트 | 부분 완료: `auth`, `admin`, `controller`, `domain` 패키지를 분리하고, `service`/`usecase`는 `auth`와 `management`로 분류했다. 회원가입/로그인/Kakao 인증/관리자 회원/포인트 충전/소프트 삭제 UseCase 서비스는 존재한다. 관리자 포인트 충전 금액은 `PointAmount` VO로 트랜잭션 전에 검증한다. | 중복 회원가입, 주문 포인트 차감 동시성, Wish/Order가 있는 회원 삭제 정책, Kakao 계정 비밀번호 변경 금지는 해결됐다. TODO: 동시 포인트 충전/차감과 Member 삭제 경쟁 확인 |
 | `Wish` | 완료: `WishContractTest` | 완료: `WishServiceTest`, `WishApiTest` | 완료: controller, domain, query, service, usecase 패키지 분리, 추가 입력은 `WishCommand`로 전달, `Member`/`Product` 직접 객체 참조 제거, 목록 응답용 `wish`-`product` 조인 쿼리 분리, `(member_id, product_id)` unique 제약 추가 | 현재 API 정책은 정의됨: 인증 필요, 첫 추가는 `200 OK`, 중복 추가는 `400 Bad Request`, 동시 중복 추가는 하나의 row만 남김, 삭제는 소유자만 가능. Product가 없는 Wish는 목록에서 미노출한다. Product/Member 삭제 정책은 남아 있다. |
 | `Order` | 부분 완료: `OrderContractTest`, `CreateOrderServiceTest`, `KakaoOrderMessageListenerTest` | 완료: `OrderServiceTest`, `OrderConcurrencyServiceTest`, `OrderApiTest` | 완료: controller, domain, query, service, usecase 패키지 분리. 생성 입력은 `OrderCommand`로 전달하고, 목록 조회는 `JdbcTemplate` query DAO로 `orders` 스냅샷을 읽는다. Order는 `productId`, `optionId`, `memberId` 값과 주문 당시 스냅샷을 보관한다. | 재고/포인트 동시성, 주문 목록 스냅샷, Kakao afterCommit async, 주문 후 Wish 유지 정책, 미인증 API 응답 정책은 해결됐다. |
 
@@ -231,6 +232,7 @@ Mockito `verify(times/never)`를 사용한다.
 - [x] 이번까지의 리팩터링/정책 변경에서는 권한 체크 동작을 변경하지 않았다는 범위를 명시한다.
 - [x] 일반 회원가입, 관리자 회원 생성/수정, 일반 로그인에서 비밀번호 평문 저장/비교 문제를 해결한다.
 - [x] Kakao 계정은 관리자 수정에서 로컬 비밀번호를 설정하거나 변경할 수 없도록 막는다.
+- [x] 관리자 포인트 충전 금액은 `PointAmount` VO로 트랜잭션 시작 전에 검증한다.
 - [ ] 동시 포인트 충전/차감과 Member 삭제 동작을 검토한다.
 
 ### Wish

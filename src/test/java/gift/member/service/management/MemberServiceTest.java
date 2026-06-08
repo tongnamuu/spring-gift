@@ -19,6 +19,7 @@ import gift.member.usecase.auth.LoginMemberUseCase;
 import gift.member.dto.LoginMemberCommand;
 import gift.member.usecase.management.UpdateMemberUseCase;
 import gift.member.vo.Password;
+import gift.member.vo.PointAmount;
 import gift.wish.domain.Wish;
 import gift.wish.domain.WishRepository;
 import gift.category.domain.Category;
@@ -246,7 +247,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
         String email = TEST_EMAIL_PREFIX + "charge@example.com";
         Member member = memberRepository.save(new Member(email, Password.encode("password123")));
 
-        Member charged = chargeMemberPointUseCase.execute(member.getId(), 3000);
+        Member charged = chargeMemberPointUseCase.execute(member.getId(), new PointAmount(3000));
 
         assertThat(charged.getPoint()).isEqualTo(3000);
         assertThat(findPoint(member.getId())).isEqualTo(3000);
@@ -254,19 +255,9 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
 
     @Test
     void chargeMemberPointRejectsMissingMember() {
-        assertThatThrownBy(() -> chargeMemberPointUseCase.execute(Long.MAX_VALUE, 3000))
+        assertThatThrownBy(() -> chargeMemberPointUseCase.execute(Long.MAX_VALUE, new PointAmount(3000)))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage(MEMBER_NOT_FOUND_MESSAGE);
-    }
-
-    @Test
-    void chargeMemberPointRejectsNonPositiveAmount() {
-        String email = TEST_EMAIL_PREFIX + "invalid-charge@example.com";
-        Member member = memberRepository.save(new Member(email, Password.encode("password123")));
-
-        assertThatThrownBy(() -> chargeMemberPointUseCase.execute(member.getId(), 0))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Amount must be greater than zero.");
     }
 
     @Test
@@ -392,7 +383,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
         member.markDeleted();
         memberRepository.save(member);
 
-        assertThatThrownBy(() -> chargeMemberPointUseCase.execute(member.getId(), 3000))
+        assertThatThrownBy(() -> chargeMemberPointUseCase.execute(member.getId(), new PointAmount(3000)))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage(MEMBER_NOT_FOUND_MESSAGE);
     }
