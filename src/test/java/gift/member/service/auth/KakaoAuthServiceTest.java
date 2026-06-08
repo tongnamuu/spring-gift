@@ -89,7 +89,7 @@ class KakaoAuthServiceTest extends AbstractMysqlServiceTest {
         assertThat(jwtProvider.getEmail(response.token())).isEqualTo(email);
         Member member = memberRepository.findByEmail(email).orElseThrow();
         assertThat(member.getId()).isEqualTo(existing.getId());
-        assertThat(Password.encode("password123").matches(member.getPassword())).isTrue();
+        assertThat(Password.matches("password123", member.getPassword())).isTrue();
         assertThat(member.getKakaoAccessToken()).isEqualTo("kakao-access-token-updated");
         assertThat(countMembersByEmail(email)).isEqualTo(1L);
     }

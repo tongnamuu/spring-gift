@@ -16,7 +16,7 @@ import gift.member.usecase.management.DeleteMemberUseCase;
 import gift.member.usecase.management.GetMemberUseCase;
 import gift.member.usecase.management.GetMembersUseCase;
 import gift.member.usecase.auth.LoginMemberUseCase;
-import gift.member.dto.MemberCredentialsCommand;
+import gift.member.dto.LoginMemberCommand;
 import gift.member.usecase.management.UpdateMemberUseCase;
 import gift.member.vo.Password;
 import gift.wish.domain.Wish;
@@ -123,7 +123,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
         assertThat(persisted.get("email")).isEqualTo(email);
         String persistedPassword = (String) persisted.get("password");
         assertThat(persistedPassword).isNotEqualTo("password123");
-        assertThat(password("password123").matches(persistedPassword)).isTrue();
+        assertThat(Password.matches("password123", persistedPassword)).isTrue();
         assertThat(((Number) persisted.get("point")).intValue()).isZero();
     }
 
@@ -199,7 +199,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
         saveMemberWithPassword(email, "password123");
 
         TokenResponse response = loginMemberUseCase.execute(
-            new MemberCredentialsCommand(email, password("password123"))
+            new LoginMemberCommand(email, "password123")
         );
 
         assertThat(response.token()).isNotBlank();
@@ -212,7 +212,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
         saveMemberWithPassword(email, "password123");
 
         assertThatThrownBy(() -> loginMemberUseCase.execute(
-            new MemberCredentialsCommand(email, password("wrong-password"))
+            new LoginMemberCommand(email, "wrong-password")
         ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Invalid email or password.");
@@ -221,7 +221,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
     @Test
     void loginMemberRejectsMissingMember() {
         assertThatThrownBy(() -> loginMemberUseCase.execute(
-            new MemberCredentialsCommand(TEST_EMAIL_PREFIX + "missing@example.com", password("password123"))
+            new LoginMemberCommand(TEST_EMAIL_PREFIX + "missing@example.com", "password123")
         ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Invalid email or password.");
@@ -235,7 +235,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
         memberRepository.save(member);
 
         assertThatThrownBy(() -> loginMemberUseCase.execute(
-            new MemberCredentialsCommand(email, password("password123"))
+            new LoginMemberCommand(email, "password123")
         ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Invalid email or password.");
@@ -333,7 +333,7 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
         assertThat(persisted.get("email")).isEqualTo(updatedEmail);
         String persistedPassword = (String) persisted.get("password");
         assertThat(persistedPassword).isNotEqualTo("updated-password");
-        assertThat(password("updated-password").matches(persistedPassword)).isTrue();
+        assertThat(Password.matches("updated-password", persistedPassword)).isTrue();
     }
 
     @Test
@@ -491,8 +491,8 @@ class MemberServiceTest extends AbstractMysqlServiceTest {
         return memberRepository.save(new Member(email, Password.encode(password)));
     }
 
-    private Password password(String rawValue) {
-        return Password.encode(rawValue);
+    private Password password(String plainText) {
+        return Password.encode(plainText);
     }
 
     private int findPoint(Long memberId) {

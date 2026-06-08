@@ -110,7 +110,7 @@ class WishApiTest extends AbstractMysqlApiTest {
     }
 
     @Test
-    void addWishReturnsCreatedAndPersistsWish() {
+    void addWishReturnsOkAndPersistsWish() {
         Member member = saveMember("add");
         Product product = saveProduct("add");
 
@@ -121,29 +121,27 @@ class WishApiTest extends AbstractMysqlApiTest {
             WishResponse.class
         );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(response.getHeaders().getLocation()).isNotNull();
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().productId()).isEqualTo(product.getId());
         assertThat(countWishes(member.getId(), product.getId())).isEqualTo(1L);
     }
 
     @Test
-    void addWishReturnsOkWhenMemberAlreadyWishedProduct() {
+    void addWishReturnsBadRequestWhenMemberAlreadyWishedProduct() {
         Member member = saveMember("duplicate");
         Product product = saveProduct("duplicate");
-        Wish existing = saveWish(member, product);
+        saveWish(member, product);
 
-        ResponseEntity<WishResponse> response = restTemplate.exchange(
+        ResponseEntity<String> response = restTemplate.exchange(
             "/api/wishes",
             HttpMethod.POST,
             authorizedEntity(member, new WishRequest(product.getId())),
-            WishResponse.class
+            String.class
         );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().id()).isEqualTo(existing.getId());
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).contains("이미 위시한 상품입니다.");
         assertThat(countWishes(member.getId(), product.getId())).isEqualTo(1L);
     }
 

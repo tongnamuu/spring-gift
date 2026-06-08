@@ -6,8 +6,8 @@ public class ProductPrice {
     private final int value;
 
     public ProductPrice(int value) {
-        if (value < 0) {
-            throw new IllegalArgumentException("상품 가격은 0 이상이어야 합니다.");
+        if (value < 1) {
+            throw new IllegalArgumentException("상품 가격은 1 이상이어야 합니다.");
         }
         this.value = value;
     }

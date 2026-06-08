@@ -49,12 +49,12 @@ class ProductApiTest extends AbstractMysqlApiTest {
     }
 
     @Test
-    void createProductAllowsZeroPrice() {
-        Category category = saveCategory("zero");
+    void createProductReturnsCreatedWhenPriceIsPositive() {
+        Category category = saveCategory("positive");
         ProductRequest request = new ProductRequest(
-            TEST_PRODUCT_PREFIX + "zero",
-            0,
-            "https://example.com/product-zero.png",
+            TEST_PRODUCT_PREFIX + "positive",
+            1,
+            "https://example.com/product-positive.png",
             category.getId()
         );
 
@@ -66,8 +66,30 @@ class ProductApiTest extends AbstractMysqlApiTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().price()).isZero();
-        assertThat(findPrice(response.getBody().id())).isZero();
+        assertThat(response.getBody().price()).isEqualTo(1);
+        assertThat(findPrice(response.getBody().id())).isEqualTo(1);
+    }
+
+    @Test
+    void createProductReturnsBadRequestWhenPriceIsZero() {
+        Category category = saveCategory("zero");
+        String name = TEST_PRODUCT_PREFIX + "zero";
+        ProductRequest request = new ProductRequest(
+            name,
+            0,
+            "https://example.com/product-zero.png",
+            category.getId()
+        );
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/api/products",
+            request,
+            String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isEqualTo("상품 가격은 1 이상이어야 합니다.");
+        assertThat(countProductsByName(name)).isZero();
     }
 
     @Test
@@ -88,7 +110,29 @@ class ProductApiTest extends AbstractMysqlApiTest {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody()).isEqualTo("상품 가격은 0 이상이어야 합니다.");
+        assertThat(response.getBody()).isEqualTo("상품 가격은 1 이상이어야 합니다.");
+        assertThat(countProductsByName(name)).isZero();
+    }
+
+    @Test
+    void createProductReturnsBadRequestWhenCategoryDoesNotExist() {
+        Long missingCategoryId = Long.MAX_VALUE;
+        String name = TEST_PRODUCT_PREFIX + "misscat";
+        ProductRequest request = new ProductRequest(
+            name,
+            20_000,
+            "https://example.com/product-missing-category.png",
+            missingCategoryId
+        );
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/api/products",
+            request,
+            String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isEqualTo("카테고리가 존재하지 않습니다. id=" + missingCategoryId);
         assertThat(countProductsByName(name)).isZero();
     }
 

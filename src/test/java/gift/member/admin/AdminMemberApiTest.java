@@ -91,7 +91,7 @@ class AdminMemberApiTest extends AbstractMysqlApiTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         Member member = memberRepository.findByEmail(email).orElseThrow();
         assertThat(member.getPassword()).isNotEqualTo("password123");
-        assertThat(Password.encode("password123").matches(member.getPassword())).isTrue();
+        assertThat(Password.matches("password123", member.getPassword())).isTrue();
     }
 
     @Test
@@ -125,7 +125,7 @@ class AdminMemberApiTest extends AbstractMysqlApiTest {
         Member updated = memberRepository.findById(member.getId()).orElseThrow();
         assertThat(updated.getEmail()).isEqualTo(updatedEmail);
         assertThat(updated.getPassword()).isNotEqualTo("updated-password");
-        assertThat(Password.encode("updated-password").matches(updated.getPassword())).isTrue();
+        assertThat(Password.matches("updated-password", updated.getPassword())).isTrue();
     }
 
     @Test
@@ -158,7 +158,7 @@ class AdminMemberApiTest extends AbstractMysqlApiTest {
 
         Member persisted = memberRepository.findById(member.getId()).orElseThrow();
         assertThat(persisted.getEmail()).isEqualTo(member.getEmail());
-        assertThat(Password.encode("password123").matches(persisted.getPassword())).isTrue();
+        assertThat(Password.matches("password123", persisted.getPassword())).isTrue();
     }
 
     @Test

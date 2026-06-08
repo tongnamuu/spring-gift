@@ -71,7 +71,7 @@ class AdminProductApiTest extends AbstractMysqlApiTest {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).contains("상품 가격은 0 이상이어야 합니다.");
+        assertThat(response.getBody()).contains("상품 가격은 1 이상이어야 합니다.");
         assertThat(countProductsByName(name)).isZero();
     }
 

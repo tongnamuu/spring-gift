@@ -2,7 +2,6 @@ package gift.wish.controller;
 
 import gift.member.auth.AuthenticationResolver;
 import gift.wish.service.WishAccessDeniedException;
-import gift.wish.usecase.AddWishResult;
 import gift.wish.usecase.AddWishUseCase;
 import gift.wish.usecase.GetWishesUseCase;
 import gift.wish.usecase.RemoveWishUseCase;
@@ -21,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.net.URI;
 import java.util.NoSuchElementException;
 
 @RestController
@@ -66,12 +64,8 @@ public class WishController {
             return ResponseEntity.status(401).build();
         }
 
-        AddWishResult result = addWishUseCase.execute(member.id(), toCommand(request));
-        if (!result.created()) {
-            return ResponseEntity.ok(result.response());
-        }
-        return ResponseEntity.created(URI.create("/api/wishes/" + result.response().id()))
-            .body(result.response());
+        var result = addWishUseCase.execute(member.id(), toCommand(request));
+        return ResponseEntity.ok(result.response());
     }
 
     @DeleteMapping("/{id}")
@@ -91,6 +85,11 @@ public class WishController {
     @ExceptionHandler(NoSuchElementException.class)
     public ResponseEntity<Void> handleNoSuchElement() {
         return ResponseEntity.notFound().build();
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<String> handleIllegalArgument(IllegalArgumentException e) {
+        return ResponseEntity.badRequest().body(e.getMessage());
     }
 
     @ExceptionHandler(WishAccessDeniedException.class)

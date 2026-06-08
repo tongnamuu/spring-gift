@@ -7,16 +7,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ProductPriceTest {
     @Test
-    void productPriceAllowsZero() {
-        ProductPrice price = new ProductPrice(0);
+    void productPriceAllowsPositiveValue() {
+        ProductPrice price = new ProductPrice(1);
 
-        assertThat(price.value()).isZero();
+        assertThat(price.value()).isEqualTo(1);
     }
 
     @Test
-    void productPriceRejectsNegativeValue() {
-        assertThatThrownBy(() -> new ProductPrice(-1))
+    void productPriceRejectsZeroValue() {
+        assertThatThrownBy(() -> new ProductPrice(0))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("상품 가격은 0 이상이어야 합니다.");
+            .hasMessage("상품 가격은 1 이상이어야 합니다.");
     }
 }

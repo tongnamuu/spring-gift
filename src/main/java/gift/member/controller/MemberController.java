@@ -1,7 +1,8 @@
 package gift.member.controller;
 
 import gift.member.auth.TokenResponse;
-import gift.member.dto.MemberCredentialsCommand;
+import gift.member.dto.LoginMemberCommand;
+import gift.member.dto.RegisterMemberCommand;
 import gift.member.usecase.auth.LoginMemberUseCase;
 import gift.member.usecase.auth.RegisterMemberUseCase;
 import gift.member.vo.Password;
@@ -35,12 +36,12 @@ public class MemberController {
 
     @PostMapping("/register")
     public ResponseEntity<TokenResponse> register(@Valid @RequestBody MemberRequest request) {
-        return ResponseEntity.ok(registerMemberUseCase.execute(toCommand(request)));
+        return ResponseEntity.ok(registerMemberUseCase.execute(toRegisterCommand(request)));
     }
 
     @PostMapping("/login")
     public ResponseEntity<TokenResponse> login(@Valid @RequestBody MemberRequest request) {
-        return ResponseEntity.ok(loginMemberUseCase.execute(toCommand(request)));
+        return ResponseEntity.ok(loginMemberUseCase.execute(toLoginCommand(request)));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -48,7 +49,11 @@ public class MemberController {
         return ResponseEntity.badRequest().body(e.getMessage());
     }
 
-    private MemberCredentialsCommand toCommand(MemberRequest request) {
-        return new MemberCredentialsCommand(request.email(), Password.encode(request.password()));
+    private RegisterMemberCommand toRegisterCommand(MemberRequest request) {
+        return new RegisterMemberCommand(request.email(), Password.encode(request.password()));
+    }
+
+    private LoginMemberCommand toLoginCommand(MemberRequest request) {
+        return new LoginMemberCommand(request.email(), request.password());
     }
 }

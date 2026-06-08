@@ -70,7 +70,7 @@ class MemberApiTest extends AbstractMysqlApiTest {
         Member persisted = memberRepository.findByEmail(request.email()).orElseThrow();
         assertThat(persisted.getEmail()).isEqualTo(request.email());
         assertThat(persisted.getPassword()).isNotEqualTo(request.password());
-        assertThat(Password.encode(request.password()).matches(persisted.getPassword())).isTrue();
+        assertThat(Password.matches(request.password(), persisted.getPassword())).isTrue();
     }
 
     @Test

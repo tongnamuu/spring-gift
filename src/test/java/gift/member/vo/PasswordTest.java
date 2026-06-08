@@ -11,7 +11,7 @@ class PasswordTest {
         Password password = Password.encode("password123");
 
         assertThat(password.value()).isNotEqualTo("password123");
-        assertThat(password.matches(password.value())).isTrue();
+        assertThat(Password.matches("password123", password.value())).isTrue();
     }
 
     @Test
@@ -30,8 +30,9 @@ class PasswordTest {
 
     @Test
     void passwordMatchesSeedBcryptHash() {
-        Password password = Password.encode("admin1234");
-
-        assertThat(password.matches("$2y$10$MY0SCnICoAGEcs6bJ8iwd.p9IPUzDfjWYcTsybSkd.jPLCXuSW7La")).isTrue();
+        assertThat(Password.matches(
+            "admin1234",
+            "$2y$10$MY0SCnICoAGEcs6bJ8iwd.p9IPUzDfjWYcTsybSkd.jPLCXuSW7La"
+        )).isTrue();
     }
 }

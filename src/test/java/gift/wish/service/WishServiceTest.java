@@ -25,8 +25,16 @@ import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.sql.PreparedStatement;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 
 import static gift.product.support.ProductFixtures.product;
 
@@ -96,16 +104,53 @@ class WishServiceTest extends AbstractMysqlServiceTest {
     }
 
     @Test
-    void addWishReturnsExistingWishWhenMemberAlreadyWishedProduct() {
+    void addWishThrowsWhenMemberAlreadyWishedProduct() {
         Member member = saveMember("duplicate");
         Product product = saveProduct("duplicate");
-        Wish existing = saveWish(member, product);
+        saveWish(member, product);
 
-        AddWishResult result = addWishService.execute(member.getId(), new WishCommand(product.getId()));
+        assertThatThrownBy(() -> addWishService.execute(member.getId(), new WishCommand(product.getId())))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("이미 위시한 상품입니다.");
 
-        assertThat(result.created()).isFalse();
-        assertThat(result.response().id()).isEqualTo(existing.getId());
         assertThat(countWishes(member.getId(), product.getId())).isEqualTo(1L);
+    }
+
+    @Test
+    void concurrentAddWishPersistsOnlyOneWishForMemberAndProduct() throws Exception {
+        Member member = saveMember("concurrent");
+        Product product = saveProduct("concurrent");
+
+        List<ConcurrentWishAttempt> attempts = addWishConcurrently(member.getId(), product.getId(), 16);
+
+        assertThat(attempts)
+            .filteredOn(ConcurrentWishAttempt::succeeded)
+            .hasSize(1);
+        assertThat(attempts)
+            .filteredOn(attempt -> !attempt.succeeded())
+            .hasSize(15)
+            .allSatisfy(attempt -> assertThat(attempt.failure())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("이미 위시한 상품입니다."));
+        assertThat(countWishes(member.getId(), product.getId())).isEqualTo(1L);
+    }
+
+    @Test
+    void wishMemberAndProductHasDatabaseUniqueConstraint() {
+        Integer uniqueIndexColumnCount = jdbcTemplate.queryForObject(
+            """
+                select count(*)
+                from information_schema.statistics
+                where table_schema = database()
+                    and table_name = 'wish'
+                    and index_name = 'uk_wish_member_product'
+                    and non_unique = 0
+                """,
+            Integer.class
+        );
+
+        assertThat(uniqueIndexColumnCount).isNotNull();
+        assertThat(uniqueIndexColumnCount).isEqualTo(2);
     }
 
     @Test
@@ -252,6 +297,55 @@ class WishServiceTest extends AbstractMysqlServiceTest {
             memberId,
             productId
         );
+    }
+
+    private List<ConcurrentWishAttempt> addWishConcurrently(Long memberId, Long productId, int requestCount) throws Exception {
+        ExecutorService executorService = Executors.newFixedThreadPool(requestCount);
+        CountDownLatch ready = new CountDownLatch(requestCount);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<ConcurrentWishAttempt>> futures = new ArrayList<>();
+
+        try {
+            IntStream.range(0, requestCount)
+                .forEach(ignored -> futures.add(executorService.submit(() -> {
+                    ready.countDown();
+                    if (!start.await(10, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("Timed out while waiting to start concurrent wish requests.");
+                    }
+                    try {
+                        return ConcurrentWishAttempt.success(addWishService.execute(memberId, new WishCommand(productId)));
+                    } catch (RuntimeException e) {
+                        return ConcurrentWishAttempt.failure(e);
+                    }
+                })));
+
+            if (!ready.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Timed out while preparing concurrent wish requests.");
+            }
+            start.countDown();
+
+            List<ConcurrentWishAttempt> results = new ArrayList<>();
+            for (Future<ConcurrentWishAttempt> future : futures) {
+                results.add(future.get(10, TimeUnit.SECONDS));
+            }
+            return results;
+        } finally {
+            executorService.shutdownNow();
+        }
+    }
+
+    private record ConcurrentWishAttempt(AddWishResult result, RuntimeException failure) {
+        private static ConcurrentWishAttempt success(AddWishResult result) {
+            return new ConcurrentWishAttempt(result, null);
+        }
+
+        private static ConcurrentWishAttempt failure(RuntimeException failure) {
+            return new ConcurrentWishAttempt(null, failure);
+        }
+
+        private boolean succeeded() {
+            return result != null;
+        }
     }
 
     private void deleteTestData() {

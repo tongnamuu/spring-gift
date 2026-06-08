@@ -52,37 +52,37 @@ class ProductControllerValidationTest {
     }
 
     @Test
-    void createProductDoesNotCallUseCaseWhenProductPriceIsNegative() {
+    void createProductDoesNotCallUseCaseWhenProductPriceIsZero() {
         RecordingCreateProductUseCase createProductUseCase = new RecordingCreateProductUseCase();
         ProductController controller = controller(createProductUseCase, new RecordingUpdateProductUseCase());
         ProductRequest request = new ProductRequest(
             "상품",
-            -1,
+            0,
             "https://example.com/product.png",
             1L
         );
 
         assertThatThrownBy(() -> controller.createProduct(request))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("상품 가격은 0 이상이어야 합니다.");
+            .hasMessage("상품 가격은 1 이상이어야 합니다.");
 
         assertThat(createProductUseCase.called()).isFalse();
     }
 
     @Test
-    void updateProductDoesNotCallUseCaseWhenProductPriceIsNegative() {
+    void updateProductDoesNotCallUseCaseWhenProductPriceIsZero() {
         RecordingUpdateProductUseCase updateProductUseCase = new RecordingUpdateProductUseCase();
         ProductController controller = controller(new RecordingCreateProductUseCase(), updateProductUseCase);
         ProductRequest request = new ProductRequest(
             "상품",
-            -1,
+            0,
             "https://example.com/product.png",
             1L
         );
 
         assertThatThrownBy(() -> controller.updateProduct(1L, request))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("상품 가격은 0 이상이어야 합니다.");
+            .hasMessage("상품 가격은 1 이상이어야 합니다.");
 
         assertThat(updateProductUseCase.called()).isFalse();
     }

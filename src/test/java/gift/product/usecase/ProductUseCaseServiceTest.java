@@ -115,6 +115,23 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
     }
 
     @Test
+    void createProductRejectsMissingCategory() {
+        Long missingCategoryId = Long.MAX_VALUE;
+        ProductRequest request = new ProductRequest(
+            TEST_PRODUCT_PREFIX + "misscat",
+            10000,
+            "https://example.com/product-missing-category.png",
+            missingCategoryId
+        );
+
+        assertThatThrownBy(() -> createProductUseCase.execute(productCommand(request)))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("카테고리가 존재하지 않습니다. id=" + missingCategoryId);
+
+        assertThat(countProductsByName(request.name())).isZero();
+    }
+
+    @Test
     void getProductReturnsPersistedProduct() {
         Category category = saveCategory(TEST_CATEGORY_PREFIX + "get");
         Product product = saveProduct(TEST_PRODUCT_PREFIX + "get", category.getId());
@@ -277,6 +294,14 @@ class ProductUseCaseServiceTest extends AbstractMysqlServiceTest {
             .filter(productResponse -> productResponse.id().equals(productId))
             .findFirst()
             .orElseThrow();
+    }
+
+    private long countProductsByName(String name) {
+        return jdbcTemplate.queryForObject(
+            "select count(*) from product where name = ?",
+            Long.class,
+            name
+        );
     }
 
     private void deleteTestData() {
